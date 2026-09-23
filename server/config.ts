@@ -27,7 +27,7 @@ export const DEFAULT_TRUSTED_DOMAINS = [
 
 export function config() {
   return {
-    geminiKey: env("GEMINI_API_KEY"),
+    geminiKey: env("GEMINI_API_KEY"), // used here for knowledge-base embeddings; chat providers live in server/ai/
     geminiBase: env("GEMINI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta").replace(/\/$/, ""),
     model: env("GEMINI_MODEL", "gemini-3.5-flash-lite"),
     embedModel: env("GEMINI_EMBED_MODEL", "gemini-embedding-001"),
@@ -40,6 +40,13 @@ export function config() {
     rateLimit: Math.max(1, parseInt(env("RATE_LIMIT_PER_10MIN", "30")) || 30),
     feedbackWebhook: env("FEEDBACK_WEBHOOK_URL"),
     maxSteps: Math.min(6, Math.max(1, parseInt(env("AGENT_MAX_STEPS", "4")) || 4)),
+    /** Per-IP daily request cap across AI routes (free beta protection). */
+    dailyLimit: Math.max(1, parseInt(env("DAILY_REQUEST_LIMIT", "150")) || 150),
+    /** Whole-request time budgets; keep below the Vercel maxDuration in vercel.json. */
+    agentDeadlineMs: Math.min(58_000, Math.max(10_000, parseInt(env("AGENT_DEADLINE_MS", "55000")) || 55_000)),
+    generateDeadlineMs: Math.min(43_000, Math.max(10_000, parseInt(env("GENERATE_DEADLINE_MS", "40000")) || 40_000)),
+    /** Unlocks /api/health?detail=1 (provider health). Leave empty to disable. */
+    adminToken: env("OLIS_ADMIN_TOKEN"),
   };
 }
 

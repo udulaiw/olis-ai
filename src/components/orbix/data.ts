@@ -6,7 +6,7 @@ import type { Mode } from "../../types";
 
 export const ORBIX_URL = "https://orbix.lk";
 
-export type AppId = "workspace" | "notes" | "papers" | "planner" | "cards" | "progress";
+export type AppId = "workspace" | "notes" | "papers" | "planner" | "cards" | "progress" | "calendar" | "tasks";
 
 export interface OrbixApp {
   id: AppId;
@@ -22,24 +22,28 @@ export interface OrbixApp {
   pos: { x: number; y: number };
 }
 
-// Six apps on an ellipse around OLIS (top-left → clockwise).
+// Eight apps on an ellipse around OLIS (top-left → clockwise).
 export const APPS: OrbixApp[] = [
-  { id: "workspace", name: "Workspace", icon: "sidebar", connectable: true, pos: { x: 17, y: 30 },
+  { id: "workspace", name: "Workspace", icon: "sidebar", connectable: true, pos: { x: 21, y: 22 },
     role: "Let OLIS understand what you're currently working on.",
     access: "The board you have open and the cards on it" },
-  { id: "notes", name: "Notes", icon: "feather", connectable: true, pos: { x: 50, y: 13 },
+  { id: "notes", name: "Notes", icon: "feather", connectable: true, pos: { x: 50, y: 11 },
     role: "Let OLIS use your own notes when explaining concepts.",
     access: "Notes you choose to share, by subject" },
-  { id: "papers", name: "Papers", icon: "file", connectable: true, pos: { x: 83, y: 30 },
+  { id: "papers", name: "Past Papers", icon: "file", connectable: true, pos: { x: 79, y: 22 },
     role: "Let OLIS analyse your practice and past-paper activity.",
     access: "Papers attempted, marks and time taken" },
-  { id: "progress", name: "Progress", icon: "target", connectable: true, pos: { x: 83, y: 70 },
+  { id: "progress", name: "Progress", icon: "target", connectable: true, pos: { x: 86, y: 50 },
     role: "Let OLIS understand your strengths and weak areas.",
     access: "Topic mastery and revision history" },
-  { id: "cards", name: "Cards", icon: "layers", connectable: false, pos: { x: 50, y: 87 },
+  { id: "cards", name: "Flashcards", icon: "layers", connectable: false, pos: { x: 79, y: 78 },
     role: "OLIS will turn explanations into ORBIX flashcard decks." },
-  { id: "planner", name: "Planner", icon: "calendar", connectable: false, pos: { x: 17, y: 70 },
+  { id: "planner", name: "Study Planner", icon: "calendar", connectable: false, pos: { x: 50, y: 89 },
     role: "OLIS will place revision sessions straight into your planner." },
+  { id: "calendar", name: "Calendar", icon: "clock", connectable: false, pos: { x: 21, y: 78 },
+    role: "OLIS will fit study sessions around your exams and classes." },
+  { id: "tasks", name: "Tasks", icon: "tasks", connectable: false, pos: { x: 14, y: 50 },
+    role: "OLIS will add follow-up tasks (\"redo Q5\", \"revise moles\") to your list." },
 ];
 
 export type Status = "live" | "beta" | "soon";

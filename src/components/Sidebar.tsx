@@ -127,7 +127,7 @@ export function Sidebar({ route, navigate, open, onClose }: Props) {
               <div className="text-[13px] font-semibold">OLIS Beta</div>
               <div className="text-[11px] text-faint">In active development</div>
             </div>
-            <code className="font-mono text-[11px] text-faint">v0.2 beta</code>
+            <code className="font-mono text-[11px] text-faint">v0.3 beta</code>
           </div>
         </div>
       </aside>

@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { tokenize } from "./text.mjs";
 import { embedQuery } from "./gemini.js";
 import type { Config } from "./config.js";
+import { embeddingAllowed } from "./ai/policy.js";
 
 export interface Chunk {
   id: string;
@@ -17,7 +18,19 @@ export interface Chunk {
   url: string | null;
   path: string;
   text: string;
+  /** v2 index metadata (optional; see knowledge/README.md) */
+  type?: "notes" | "syllabus" | "past_paper" | "marking_scheme" | "resource";
+  unit?: string;
+  year?: string;
+  paper?: string;
+  question?: string;
+  difficulty?: string;
+  language?: string;
+  marks?: string;
+  question_type?: string;
+  verified?: boolean;
 }
+export type ChunkType = NonNullable<Chunk["type"]>;
 interface IndexFile {
   version: number;
   builtAt: string;
@@ -96,17 +109,28 @@ export interface Hit {
 }
 
 /** Search the knowledge base. Semantic search is used when available; failures fall back to keywords. */
-export async function searchKnowledge(cfg: Config, query: string, opts: { k?: number; subject?: string; signal?: AbortSignal } = {}): Promise<Hit[]> {
+export async function searchKnowledge(
+  cfg: Config,
+  query: string,
+  opts: { k?: number; subject?: string; signal?: AbortSignal; types?: ChunkType[]; year?: string } = {},
+): Promise<Hit[]> {
   const idx = loadIndex();
   if (!idx.chunks.length) return [];
   const k = opts.k ?? 4;
-  const kw = bm25(idx, query).slice(0, 20);
+  // Type/year filters (e.g. only past papers). Old v1 chunks have no type → "notes".
+  const allowed = (i: number) => {
+    const c = idx.chunks[i];
+    if (opts.types && !opts.types.includes(c.type ?? "notes")) return false;
+    if (opts.year && c.year !== opts.year) return false;
+    return true;
+  };
+  const kw = bm25(idx, query).filter((h) => allowed(h.i)).slice(0, 20);
 
   let sem: { i: number; score: number }[] = [];
-  if (idx.vectors && idx.dims && cfg.geminiKey) {
+  if (idx.vectors && idx.dims && cfg.geminiKey && embeddingAllowed(cfg.embedModel)) {
     try {
       const qv = await embedQuery(cfg, query, idx.dims, opts.signal);
-      sem = cosineRank(idx, qv).slice(0, 20).filter((h) => h.score > 0.5);
+      sem = cosineRank(idx, qv).filter((h) => allowed(h.i)).slice(0, 20).filter((h) => h.score > 0.5);
     } catch {
       sem = []; // quota / network: keyword search still works
     }
@@ -145,5 +169,6 @@ export async function searchKnowledge(cfg: Config, query: string, opts: { k?: nu
 
 export function indexStats() {
   const idx = loadIndex();
-  return { files: idx.files, chunks: idx.chunks.length, semantic: Boolean(idx.vectors), builtAt: idx.builtAt || null };
+  const pastPaperChunks = idx.chunks.filter((c) => c.type === "past_paper" || c.type === "marking_scheme").length;
+  return { files: idx.files, chunks: idx.chunks.length, pastPaperChunks, semantic: Boolean(idx.vectors), builtAt: idx.builtAt || null };
 }

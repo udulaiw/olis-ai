@@ -16,6 +16,33 @@ export interface LearningContext {
   style: LearningStyle;
 }
 
+/** Answer language. "auto" = match whatever the student writes (English, Sinhala or Singlish). */
+export type Language = "auto" | "en" | "si";
+export const LANGUAGES: { id: Language; label: string }[] = [
+  { id: "auto", label: "Auto" },
+  { id: "en", label: "English" },
+  { id: "si", label: "සිංහල" },
+];
+
+export type Depth = "quick" | "standard" | "deep";
+
+/**
+ * Non-sensitive learning preferences, saved in this browser only and sent with
+ * each request so OLIS can tailor answers.
+ */
+export interface StudyProfile {
+  stream: string;
+  subjects: string[];
+  language: Language;
+  depth: Depth;
+  currentTopic: string;
+  weakTopics: string[];
+  goals: string;
+}
+
+export const STREAMS = ["", "Physical Science (Maths)", "Biological Science", "Commerce", "Arts", "Technology", "Other"] as const;
+export const PROFILE_SUBJECTS = ["Combined Mathematics", "Physics", "Chemistry", "Biology", "ICT", "Other"] as const;
+
 /** What the student wants OLIS to do. "ask" = auto-detect from the message. */
 export type Mode = "ask" | "explain" | "solve" | "plan" | "quiz" | "summarize" | "simplify";
 
@@ -71,9 +98,16 @@ export interface Attachment {
   chars: number;
 }
 
+/** An image the student attached (e.g. a photo of a question). Only a small preview is saved. */
+export interface ImageAttachment {
+  name: string;
+  /** Small JPEG data URL for the chat bubble (the full image is not stored). */
+  thumb: string;
+}
+
 export interface Source {
   ref: number;
-  kind: "notes" | "wikipedia" | "web";
+  kind: "notes" | "paper" | "wikipedia" | "web";
   title: string;
   url: string | null;
   snippet: string;
@@ -96,6 +130,7 @@ export interface Message {
   quiz?: Quiz;
   quizProgress?: QuizProgress;
   attachment?: Attachment;
+  images?: ImageAttachment[];
   /** Hidden text sent to the engine (e.g. attached file contents). Never shown as a bubble. */
   hiddenContext?: string;
   /** Agent research steps (OLIS Cloud) */
@@ -107,6 +142,8 @@ export interface Message {
   feedback?: "up" | "down";
   /** Follow-up prompts shown as chips */
   suggestions?: string[];
+  /** Transient status while working, e.g. OLIS switched AI engine after a failure */
+  notice?: "switching";
 }
 
 export interface Chat {
@@ -125,5 +162,6 @@ export interface Settings {
   theme: Theme;
   engine: EngineKind;
   context: LearningContext;
+  profile: StudyProfile;
   noticeDismissed: boolean;
 }

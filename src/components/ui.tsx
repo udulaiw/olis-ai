@@ -2,7 +2,7 @@ import { useEffect, useRef, type ReactNode } from "react";
 import { useStore } from "../store/AppStore";
 import { Icon, type IconName } from "./Icon";
 import { cx } from "../lib/utils";
-import { LEVELS, STYLES, SUBJECTS, type Level, type LearningStyle, type Subject } from "../types";
+import { LANGUAGES, LEVELS, STYLES, SUBJECTS, type Language, type Level, type LearningStyle, type Subject } from "../types";
 
 // ── Toasts ─────────────────────────────────────
 export function Toasts() {
@@ -98,12 +98,26 @@ export function ConfirmDialog({
 }
 
 // ── Learning context picker ────────────────────
-function SelectChip<T extends string>({ icon, label, value, options, onChange }: { icon: IconName; label: string; value: T; options: readonly T[]; onChange: (v: T) => void }) {
+function SelectChip<T extends string>({
+  icon,
+  label,
+  value,
+  options,
+  onChange,
+  labels,
+}: {
+  icon: IconName;
+  label: string;
+  value: T;
+  options: readonly T[];
+  onChange: (v: T) => void;
+  labels?: Partial<Record<T, string>>;
+}) {
   return (
     <label className="chip relative cursor-pointer pr-7 focus-within:border-line-strong focus-within:text-ink" title={label}>
       <Icon name={icon} size={14} className="shrink-0 text-faint" />
       <span className="sr-only">{label}</span>
-      <span className="truncate">{value}</span>
+      <span className="truncate">{labels?.[value] ?? value}</span>
       <Icon name="chevronDown" size={13} className="pointer-events-none absolute right-2.5 text-faint" />
       <select
         className="absolute inset-0 cursor-pointer opacity-0"
@@ -113,7 +127,7 @@ function SelectChip<T extends string>({ icon, label, value, options, onChange }:
       >
         {options.map((o) => (
           <option key={o} value={o}>
-            {o}
+            {labels?.[o] ?? o}
           </option>
         ))}
       </select>
@@ -121,8 +135,10 @@ function SelectChip<T extends string>({ icon, label, value, options, onChange }:
   );
 }
 
+const LANGUAGE_LABELS = Object.fromEntries(LANGUAGES.map((l) => [l.id, l.id === "auto" ? "Auto language" : l.label])) as Record<Language, string>;
+
 export function ContextBar({ className, compact, scroll }: { className?: string; compact?: boolean; scroll?: boolean }) {
-  const { settings, setContext } = useStore();
+  const { settings, setContext, setProfile } = useStore();
   const c = settings.context;
   return (
     <div className={cx("flex items-center gap-2", scroll ? "no-scrollbar -mx-4 flex-nowrap overflow-x-auto px-4 [&>*]:shrink-0" : "flex-wrap", className)}>
@@ -130,6 +146,14 @@ export function ContextBar({ className, compact, scroll }: { className?: string;
       <SelectChip<Subject> icon="book" label="Subject" value={c.subject} options={SUBJECTS} onChange={(subject) => setContext({ subject })} />
       <SelectChip<Level> icon="layers" label="Level" value={c.level} options={LEVELS} onChange={(level) => setContext({ level })} />
       <SelectChip<LearningStyle> icon="feather" label="Learning style" value={c.style} options={STYLES} onChange={(style) => setContext({ style })} />
+      <SelectChip<Language>
+        icon="globe"
+        label="Answer language"
+        value={settings.profile.language}
+        options={LANGUAGES.map((l) => l.id)}
+        labels={LANGUAGE_LABELS}
+        onChange={(language) => setProfile({ language })}
+      />
     </div>
   );
 }

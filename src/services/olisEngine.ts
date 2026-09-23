@@ -10,19 +10,19 @@
 //   summarizeText()      summary
 //
 // Each routes to the active engine:
-//   "cloud" → OLIS Cloud (Vercel backend: Gemini agent + RAG + web research).
+//   "cloud" → OLIS Cloud (Vercel backend: multi-provider AI router + RAG + web research).
 //             No keys in the browser.
 //   "demo"  → offline, $0, pattern-based engine (./demo), also the automatic
 //             fallback when the cloud is unreachable.
 // ─────────────────────────────────────────────
-import type { Difficulty, EngineKind, Flashcard, LearningContext, Mode, Quiz, Source, StudyPlan, Subject } from "../types";
+import type { Difficulty, EngineKind, Flashcard, LearningContext, Mode, Quiz, Source, StudyPlan, StudyProfile, Subject } from "../types";
 import { sleep } from "../lib/utils";
 import { detectIntent, type Intent } from "./intent";
 import { demoFlashcards, demoQuiz, demoRespond, detectSubject, type DemoOutput } from "./demo/demoEngine";
 import { searchWikipedia, wikiAnswer, wikiQuery } from "./wikipedia";
 import { buildStudyPlan, type PlanInput } from "./demo/planner";
 import { summarize, summaryToMarkdown } from "./demo/summarizer";
-import { OlisError, cloudAgent, cloudGenerate } from "./cloud";
+import { OlisError, cloudAgent, cloudGenerate, type CloudImage } from "./cloud";
 
 export { OlisError };
 export { planToMarkdown } from "./demo/planner";
@@ -31,6 +31,8 @@ export type { Intent };
 
 export interface EngineConfig {
   kind: EngineKind;
+  /** The student's saved study profile (language, depth, weak topics…), sent to OLIS Cloud. */
+  profile?: StudyProfile;
 }
 
 export interface Turn {
@@ -43,12 +45,17 @@ export type EngineEvent =
   | { type: "quiz"; quiz: Quiz }
   | { type: "step"; id: string; label: string; status: "running" | "done" | "failed" }
   | { type: "sources"; sources: Source[] }
-  | { type: "suggestions"; items: string[] };
+  | { type: "suggestions"; items: string[] }
+  /** OLIS Cloud switched engine mid-answer: keep only the first `to` characters. */
+  | { type: "rewind"; to: number }
+  | { type: "notice"; kind: "switching" };
 
 export interface ResponseRequest {
   input: string;
   /** Extra hidden context (e.g. attached file text). */
   attachment?: string;
+  /** Photos / screenshots (OLIS Cloud only). */
+  images?: CloudImage[];
   mode: Mode;
   context: LearningContext;
   history: Turn[];
@@ -127,6 +134,14 @@ export async function* generateResponse(req: ResponseRequest, cfg: EngineConfig)
   // An attached document with no specific instruction → summarise it
   if (req.attachment && (intent === "ask" || !req.input.trim())) intent = "summarize";
 
+  if (cfg.kind === "demo" && req.images?.length) {
+    yield* streamText(
+      "Reading photos and screenshots needs **OLIS Cloud**, and it isn't reachable right now, so I'm running offline.\n\nYou can type the question out and I'll help step by step, or try again when OLIS Cloud is back.",
+      req.signal,
+    );
+    return;
+  }
+
   if (cfg.kind === "demo") {
     const docOnly = req.attachment ? `${req.input}\n\n${stripAttachHeader(req.attachment)}` : req.input;
     const out = demoRespond(
@@ -140,7 +155,7 @@ export async function* generateResponse(req: ResponseRequest, cfg: EngineConfig)
   }
 
   // Cloud: quizzes are generated as structured JSON so they stay interactive
-  if (intent === "quiz") {
+  if (intent === "quiz" && !req.images?.length) {
     const topic = req.input.replace(/^(please\s+)?(can you\s+)?(quiz|test)( me)?(\s+(on|about|in))?/i, "").trim() || req.context.subject;
     yield { type: "step", id: "q1", label: `Checking OLIS study notes for “${topic}”`, status: "running" };
     const { data, fallbackReason, sources } = await generateQuiz(
@@ -155,9 +170,19 @@ export async function* generateResponse(req: ResponseRequest, cfg: EngineConfig)
     return;
   }
 
-  const messages = [...req.history.slice(-16), { role: "user" as const, content: req.input || "Please summarise the attached document." }];
+  const messages = [
+    ...req.history.slice(-16),
+    { role: "user" as const, content: req.input || (req.images?.length ? "Please help me with this." : "Please summarise the attached document.") },
+  ];
   for await (const ev of cloudAgent(
-    { messages, attachment: req.attachment ? stripAttachHeader(req.attachment) : undefined, mode: intent === "greeting" || intent === "thanks" || intent === "about" ? "ask" : (intent as Mode), context: req.context },
+    {
+      messages,
+      attachment: req.attachment ? stripAttachHeader(req.attachment) : undefined,
+      images: req.images,
+      mode: intent === "greeting" || intent === "thanks" || intent === "about" ? "ask" : (intent as Mode),
+      context: req.context,
+      profile: cfg.profile,
+    },
     req.signal,
   )) {
     yield ev;
@@ -191,7 +216,7 @@ export async function generateQuiz(req: QuizRequest, cfg: EngineConfig): Promise
   try {
     const n = req.count ?? 5;
     const { data, sources } = await cloudGenerate<Quiz>(
-      { kind: "quiz", topic: req.topic || req.subject || req.context.subject, subject: req.subject, difficulty: req.difficulty ?? "Mixed", count: n, context: req.context },
+      { kind: "quiz", topic: req.topic || req.subject || req.context.subject, subject: req.subject, difficulty: req.difficulty ?? "Mixed", count: n, context: req.context, profile: cfg.profile },
       req.signal,
     );
     return {
@@ -222,7 +247,7 @@ export async function generateFlashcards(
     return { data: demo(), source: "demo" };
   }
   try {
-    const { data, sources } = await cloudGenerate<{ title: string; cards: Flashcard[] }>({ kind: "flashcards", topic, subject: ctx.subject, context: ctx }, signal);
+    const { data, sources } = await cloudGenerate<{ title: string; cards: Flashcard[] }>({ kind: "flashcards", topic, subject: ctx.subject, context: ctx, profile: cfg.profile }, signal);
     return { data, source: "cloud", sources };
   } catch (e) {
     if (isAbort(e)) throw e;
@@ -244,7 +269,7 @@ export async function* explainConcept(topic: string, ctx: LearningContext, cfg: 
     yield* playDemo(demoRespond(`Explain ${topic}`, "explain", ctx, []), signal);
     return;
   }
-  yield* cloudAgent({ messages: [{ role: "user", content: `Explain: ${topic}` }], mode: "explain", context: ctx }, signal);
+  yield* cloudAgent({ messages: [{ role: "user", content: `Explain: ${topic}` }], mode: "explain", context: ctx, profile: cfg.profile }, signal);
 }
 
 // ── Summary ────────────────────────────────────

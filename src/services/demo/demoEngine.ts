@@ -123,7 +123,7 @@ function unknownTopic(query: string, ctx: LearningContext, subject?: Subject): s
       `5. **Test yourself** tomorrow without notes (active recall).`,
     ].join("\n"),
     `**Topics I can teach offline right now${subj !== "General" ? ` in ${subj}` : ""}:**\n${known.map((t) => `- ${t.title}`).join("\n")}`,
-    `*For open-ended questions on any topic, switch the intelligence engine to **Gemini** in **Settings**. The key is free and doesn't need a card.*`,
+    `*For open-ended questions on any topic, OLIS Cloud gives full answers. It turns on automatically when it's reachable (see **Settings**).*`,
   ].join("\n\n");
 }
 
@@ -157,7 +157,7 @@ export function smallTalk(raw: string): string | null {
   if (/(who|which person) (made|created|built|developed|designed|owns) you|who is your (creator|developer|maker|owner)|your (creator|developer|maker)|who'?s behind (you|olis)|who made olis|who created olis/.test(t))
     return `${CREATOR_LINE} You can see his work on [GitHub](https://github.com/udulaiw).\n\nI'm still a **beta model**, so I'm learning and improving every day.`;
   if (/^(what'?s|what is) your name|^who are you|^what are you\b|^are you (an? )?(ai|bot|robot|human|real|chatgpt|gemini|claude)/.test(t))
-    return `I'm **OLIS**, the *Orbix Learning Intelligence System*: an AI learning assistant, currently in **beta**. ${CREATOR_LINE}\n\nIn cloud mode I think with Google's Gemini models, research with Wikipedia and my own study notes, and cite my sources. Offline, I use my built-in lessons, solver and Wikipedia.`;
+    return `I'm **OLIS**, the *Orbix Learning Intelligence System*: an AI learning assistant, currently in **beta**. ${CREATOR_LINE}\n\nIn cloud mode I use several AI engines behind the scenes, research with Wikipedia and my own study notes, and cite my sources. Offline, I use my built-in lessons, solver and Wikipedia.`;
   if (/^(thanks|thank you|thx|ty|tysm|cheers|thank u)\b/.test(t))
     return pick(["Anytime! 😊 Want a quick quiz to lock it in?", "You're welcome! Keep going, you're doing great.", "Happy to help! What's next?"]);
   if (/^(ok(ay)?|cool|nice|great|awesome|got it|alright|k|kk|sure)[\s!.👍]*$/.test(t))

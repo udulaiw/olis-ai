@@ -40,10 +40,14 @@ function walk(dir) {
   if (!existsSync(dir)) return [];
   return readdirSync(dir).flatMap((name) => {
     const p = join(dir, name);
-    if (statSync(p).isDirectory()) return walk(p);
-    return [".md", ".txt", ".markdown"].includes(extname(name).toLowerCase()) && name.toLowerCase() !== "readme.md" ? [p] : [];
+    if (statSync(p).isDirectory()) return name.startsWith("_") ? [] : walk(p);
+    // README files and anything starting with "_" (templates, drafts) are not indexed
+    return [".md", ".txt", ".markdown"].includes(extname(name).toLowerCase()) && name.toLowerCase() !== "readme.md" && !name.startsWith("_") ? [p] : [];
   });
 }
+
+const TYPES = new Set(["notes", "syllabus", "past_paper", "marking_scheme", "resource"]);
+const pick = (o, keys) => Object.fromEntries(keys.filter((k) => o[k]).map((k) => [k, o[k]]));
 
 const files = walk(KB_DIR);
 const chunks = [];
@@ -52,7 +56,11 @@ for (const file of files) {
   const { meta, body } = parseFrontmatter(raw);
   const rel = relative(ROOT, file).replace(/\\/g, "/");
   const title = meta.title || body.match(/^#\s+(.+)/m)?.[1]?.trim() || basename(file, extname(file)).replace(/[-_]/g, " ");
-  const subject = meta.subject || rel.split("/")[1]?.replace(/-/g, " ") || "General";
+  const folder = rel.split("/")[1] ?? "";
+  // Past papers / syllabus live in their own folders; their subject comes from frontmatter
+  const type = TYPES.has(meta.type) ? meta.type : folder === "past-papers" ? "past_paper" : folder === "syllabus" ? "syllabus" : "notes";
+  const subject = meta.subject || (["past-papers", "syllabus"].includes(folder) ? rel.split("/")[2]?.replace(/-/g, " ") : folder.replace(/-/g, " ")) || "General";
+  if (type === "past_paper" && !meta.year) console.warn(`  ⚠ ${rel}: past paper without "year:" in its frontmatter`);
   for (const c of chunkDocument(body, { title })) {
     chunks.push({
       id: createHash("sha1").update(rel + c.heading + c.text).digest("hex").slice(0, 12),
@@ -63,6 +71,10 @@ for (const file of files) {
       url: meta.url || null,
       path: rel,
       text: c.text,
+      // Optional structure (see knowledge/README.md). Absent fields are omitted.
+      ...pick(meta, ["unit", "year", "paper", "question", "question_type", "difficulty", "language", "marks"]),
+      type,
+      verified: meta.verified === "true",
     });
   }
 }
@@ -125,6 +137,6 @@ if (!KEY) {
 mkdirSync(OUT_DIR, { recursive: true });
 writeFileSync(
   OUT,
-  JSON.stringify({ version: 1, builtAt: new Date().toISOString(), embedModel, dims: vectors ? DIMS : 0, files: files.length, chunks, vectors }),
+  JSON.stringify({ version: 2, builtAt: new Date().toISOString(), embedModel, dims: vectors ? DIMS : 0, files: files.length, chunks, vectors }),
 );
 console.log(`OLIS index: ${files.length} files → ${chunks.length} chunks → ${relative(ROOT, OUT)}${vectors ? " (with embeddings)" : ""}`);

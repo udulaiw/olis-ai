@@ -34,6 +34,7 @@
     "api",
     "server",
     "scripts/vite-api.ts",
+    "scripts/ai-selftest.ts",
     "vite.config.ts"
   ]
 }

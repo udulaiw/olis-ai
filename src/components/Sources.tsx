@@ -6,6 +6,7 @@ import { cx } from "../lib/utils";
 
 const KIND: Record<Source["kind"], { label: string; icon: IconName; cls: string }> = {
   notes: { label: "OLIS notes", icon: "book", cls: "text-accent" },
+  paper: { label: "Past paper", icon: "file", cls: "text-accent" },
   wikipedia: { label: "Wikipedia", icon: "text", cls: "text-lavender" },
   web: { label: "Web", icon: "search", cls: "text-muted" },
 };
@@ -28,7 +29,7 @@ export function SourceList({ sources, className }: { sources: Source[]; classNam
         <span className="eyebrow">Sources</span>
         <span className="text-[11px] text-faint">{sources.length}</span>
       </div>
-      <div className="grid gap-1.5 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
         {shown.map((s) => {
           const k = KIND[s.kind];
           const inner = (
@@ -44,7 +45,7 @@ export function SourceList({ sources, className }: { sources: Source[]; classNam
               {s.url && <Icon name="arrowRight" size={13} className="mt-1 shrink-0 -rotate-45 text-faint transition group-hover:text-ink" />}
             </>
           );
-          const cls = "group flex items-start gap-2.5 rounded-xl border border-line bg-surface/60 px-3 py-2 text-left outline outline-2 outline-transparent transition hover:border-line-strong";
+          const cls = "group flex min-w-0 items-start gap-2.5 rounded-xl border border-line bg-surface/60 px-3 py-2 text-left outline outline-2 outline-transparent transition hover:border-line-strong";
           return s.url ? (
             <a key={s.ref} data-src-ref={s.ref} href={s.url} target="_blank" rel="noopener noreferrer" className={cls} title={s.snippet}>
               {inner}

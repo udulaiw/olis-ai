@@ -2,19 +2,18 @@
 import { config } from "../server/config.js";
 import { guard, json, errorJson } from "../server/http.js";
 import { generate } from "../server/generate.js";
-import { UpstreamError } from "../server/gemini.js";
-
-const str = (v: unknown, max: number, d = "") => (typeof v === "string" ? v.slice(0, max) : d);
+import { RouterExhausted, anyEngineConfigured } from "../server/ai/router.js";
+import { ProviderError } from "../server/ai/types.js";
+import { parseContext, parseProfile, str } from "../server/sanitize.js";
 
 export async function POST(request: Request): Promise<Response> {
   const cfg = config();
-  const g = await guard(request, cfg, "generate");
+  const g = await guard(request, cfg, "generate", { daily: true });
   if (g instanceof Response) return g;
   const b = (g.body ?? {}) as Record<string, unknown>;
   const kind = b.kind === "flashcards" ? "flashcards" : b.kind === "quiz" ? "quiz" : null;
   if (!kind) return errorJson(400, "bad_request", "kind must be 'quiz' or 'flashcards'.");
-  if (!cfg.geminiKey) return errorJson(503, "config", "OLIS Cloud isn't configured yet (GEMINI_API_KEY missing).");
-  const ctx = (b.context ?? {}) as Record<string, unknown>;
+  if (!anyEngineConfigured("structured")) return errorJson(503, "config", "OLIS Cloud isn't configured yet: no AI provider key is set on the server.");
   try {
     const out = await generate(
       cfg,
@@ -24,14 +23,16 @@ export async function POST(request: Request): Promise<Response> {
         subject: str(b.subject, 40) || undefined,
         difficulty: str(b.difficulty, 20) || undefined,
         count: typeof b.count === "number" ? b.count : undefined,
-        context: { subject: str(ctx.subject, 40, "General"), level: str(ctx.level, 20, "Intermediate"), style: str(ctx.style, 40, "Detailed explanation") },
+        context: parseContext(b.context),
+        profile: parseProfile(b.profile),
       },
       request.signal,
     );
     return json(out);
   } catch (e) {
-    if (e instanceof UpstreamError) return errorJson(e.status, e.code, e.message);
-    console.error("[olis/generate]", e);
+    if (e instanceof RouterExhausted) return errorJson(e.allRateLimited ? 429 : 503, e.allRateLimited ? "rate_limit" : "unavailable", e.message);
+    if (e instanceof ProviderError && e.category === "blocked") return errorJson(400, "blocked", "OLIS can't help with that request. Try rephrasing it.");
+    console.error("[olis/generate]", (e as Error)?.name, (e as Error)?.message?.slice(0, 200));
     return errorJson(502, "server", "OLIS couldn't generate that. Please try again.");
   }
 }

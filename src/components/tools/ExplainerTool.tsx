@@ -46,6 +46,10 @@ export function ExplainerTool() {
           setStatus("streaming");
         } else if (ev.type === "sources") setSources(ev.sources);
         else if (ev.type === "step") setStepLabel(ev.status === "running" ? ev.label : "");
+        else if (ev.type === "rewind") {
+          acc = acc.slice(0, ev.to);
+          setText(acc);
+        } else if (ev.type === "notice") setStepLabel("OLIS is switching to another AI engine. One moment…");
       }
       setStatus("done");
     } catch (e) {

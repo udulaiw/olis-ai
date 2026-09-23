@@ -1,6 +1,7 @@
 // Request guards shared by every API route: origin check, rate limit,
 // body size limit, JSON helpers.
 import type { Config } from "./config.js";
+import { incr, today } from "./ai/store.js";
 
 export const json = (data: unknown, status = 200, headers: Record<string, string> = {}) =>
   new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...headers } });
@@ -8,13 +9,16 @@ export const json = (data: unknown, status = 200, headers: Record<string, string
 export const errorJson = (status: number, code: string, message: string, headers: Record<string, string> = {}) =>
   json({ error: { code, message } }, status, headers);
 
-function clientIp(req: Request) {
-  return (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || req.headers.get("x-real-ip") || "unknown";
+export function clientIp(req: Request) {
+  // On Vercel, x-real-ip / x-forwarded-for are set by the platform (not the client)
+  return req.headers.get("x-real-ip") || (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || "unknown";
 }
 
 function originAllowed(req: Request, cfg: Config) {
   const origin = req.headers.get("origin");
-  if (!origin) return true; // same-origin navigations / server-to-server
+  // Browsers always send Origin on POST (fetch), so a POST without it is a script
+  // calling the API directly: refuse it. GET (health) without Origin is fine.
+  if (!origin) return req.method !== "POST" || req.headers.get("sec-fetch-site") === "same-origin";
   let host = "";
   try {
     host = new URL(origin).host;
@@ -43,11 +47,26 @@ function rateLimited(key: string, limit: number, windowMs = 10 * 60_000) {
   return 0;
 }
 
-export async function guard(req: Request, cfg: Config, bucket: string, opts: { limit?: number; maxBytes?: number } = {}): Promise<{ body: unknown } | Response> {
+export async function guard(
+  req: Request,
+  cfg: Config,
+  bucket: string,
+  opts: { limit?: number; maxBytes?: number; daily?: boolean } = {},
+): Promise<{ body: unknown } | Response> {
   if (!originAllowed(req, cfg)) return errorJson(403, "forbidden_origin", "Requests are only accepted from the OLIS app.");
-  const wait = rateLimited(`${bucket}:${clientIp(req)}`, opts.limit ?? cfg.rateLimit);
+  const ip = clientIp(req);
+  const wait = rateLimited(`${bucket}:${ip}`, opts.limit ?? cfg.rateLimit);
   if (wait) return errorJson(429, "rate_limit", `You're asking faster than the beta allows. Try again in ${Math.ceil(wait / 60)} min.`, { "Retry-After": String(wait) });
+  // Daily cap per student (IP), shared by every AI route
+  if (opts.daily) {
+    const { day, ttl } = today();
+    const used = await incr(`ip:${ip}:${day}`, ttl);
+    if (used > cfg.dailyLimit)
+      return errorJson(429, "daily_limit", "You've reached today's OLIS Beta limit. It resets at 5:30 AM Sri Lanka time. Thanks for studying hard!", { "Retry-After": String(ttl) });
+  }
   if (req.method !== "POST") return { body: null };
+  const declared = parseInt(req.headers.get("content-length") ?? "0");
+  if (declared > (opts.maxBytes ?? 120_000)) return errorJson(413, "too_large", "That message is too long for OLIS Beta.");
   const text = await req.text();
   if (text.length > (opts.maxBytes ?? 120_000)) return errorJson(413, "too_large", "That message is too long for OLIS Beta.");
   try {

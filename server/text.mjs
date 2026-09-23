@@ -14,7 +14,8 @@ const STOP = new Set(
 
 /** @param {string} text @returns {string[]} */
 export function tokenize(text) {
-  return (text.toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").match(/[a-z0-9]+/g) ?? [])
+  // Latin words + Sinhala words (U+0D80–U+0DFF) so Sinhala notes and questions are searchable too
+  return (text.toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").match(/[a-z0-9]+|[\u0D80-\u0DFF\u200D]+/g) ?? [])
     .filter((w) => w.length > 1 && !STOP.has(w))
     .map((w) => (w.length > 4 && w.endsWith("ies") ? w.slice(0, -3) + "y" : w.length > 3 && w.endsWith("s") && !w.endsWith("ss") ? w.slice(0, -1) : w));
 }
@@ -25,6 +26,7 @@ export function tokenize(text) {
  * @returns {{ meta: Record<string,string>, body: string }}
  */
 export function parseFrontmatter(src) {
+  src = src.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n"); // Windows line endings / BOM
   const m = src.match(/^---\n([\s\S]*?)\n---\n?/);
   if (!m) return { meta: {}, body: src };
   /** @type {Record<string,string>} */

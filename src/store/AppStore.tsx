@@ -1,15 +1,26 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import type { Chat, EngineKind, LearningContext, Message, Mode, QuizProgress, Settings } from "../types";
+import type { Chat, EngineKind, LearningContext, Message, Mode, QuizProgress, Settings, StudyProfile } from "../types";
 import { KEYS, load, remove, save } from "../lib/storage";
 import { isAbort, titleFrom, uid } from "../lib/utils";
 import { OlisError, generateResponse, type EngineConfig } from "../services/olisEngine";
-import { cloudHealth, sendFeedback, type CloudHealth } from "../services/cloud";
+import { cloudHealth, sendFeedback, type CloudHealth, type CloudImage } from "../services/cloud";
 
 // ── Defaults ───────────────────────────────────
+export const DEFAULT_PROFILE: StudyProfile = {
+  stream: "",
+  subjects: [],
+  language: "auto",
+  depth: "standard",
+  currentTopic: "",
+  weakTopics: [],
+  goals: "",
+};
+
 export const DEFAULT_SETTINGS: Settings = {
   theme: "dark",
   engine: "cloud", // falls back to "demo" automatically when the cloud isn't reachable
   context: { subject: "General", level: "Intermediate", style: "Detailed explanation" },
+  profile: DEFAULT_PROFILE,
   noticeDismissed: false,
 };
 
@@ -26,12 +37,15 @@ export interface SendInput {
   text: string;
   mode: Mode;
   attachment?: { name: string; text: string };
+  /** Photos / screenshots, already downsized. Only `thumb` is saved to history. */
+  images?: { name: string; mimeType: string; data: string; thumb: string }[];
 }
 
 interface Store {
   settings: Settings;
   updateSettings: (patch: Partial<Settings>) => void;
   setContext: (patch: Partial<LearningContext>) => void;
+  setProfile: (patch: Partial<StudyProfile>) => void;
   resolvedTheme: "dark" | "light";
   /** The engine actually used right now (cloud falls back to demo when unreachable) */
   engine: EngineConfig;
@@ -85,7 +99,13 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     delete saved.geminiKey;
     delete saved.geminiModel;
     const engine = saved.engine === "demo" ? "demo" : "cloud";
-    return { ...DEFAULT_SETTINGS, ...saved, engine, context: { ...DEFAULT_SETTINGS.context, ...(saved.context ?? {}) } } as Settings;
+    return {
+      ...DEFAULT_SETTINGS,
+      ...saved,
+      engine,
+      context: { ...DEFAULT_SETTINGS.context, ...(saved.context ?? {}) },
+      profile: { ...DEFAULT_PROFILE, ...(saved.profile ?? {}) },
+    } as Settings;
   });
   useEffect(() => {
     save(KEYS.settings, settings);
@@ -96,6 +116,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     (patch: Partial<LearningContext>) => setSettings((s) => ({ ...s, context: { ...s.context, ...patch } })),
     [],
   );
+  const setProfile = useCallback((patch: Partial<StudyProfile>) => setSettings((s) => ({ ...s, profile: { ...s.profile, ...patch } })), []);
 
   // ── Theme ────────────────────────────────────
   const [systemLight, setSystemLight] = useState(() => matchMedia("(prefers-color-scheme: light)").matches);
@@ -129,10 +150,13 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   // ── Engine config ────────────────────────────
   // Cloud is used only when chosen AND reachable; otherwise the offline engine answers.
   const effectiveKind: EngineKind = settings.engine === "cloud" && cloudStatus === "ready" ? "cloud" : "demo";
-  const engine: EngineConfig = useMemo(() => ({ kind: effectiveKind }), [effectiveKind]);
+  const engine: EngineConfig = useMemo(() => ({ kind: effectiveKind, profile: settings.profile }), [effectiveKind, settings.profile]);
+  // Students see "OLIS Cloud", not provider/model names
   const engineLabel =
     effectiveKind === "cloud"
-      ? `OLIS Cloud · ${health?.model ?? "Gemini"}`
+      ? health?.engines?.busy
+        ? "OLIS Cloud · busy"
+        : "OLIS Cloud"
       : settings.engine === "cloud" && cloudStatus === "checking"
         ? "Connecting to OLIS Cloud…"
         : settings.engine === "cloud"
@@ -197,6 +221,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
 
   // ── Running generations ──────────────────────
   const controllers = useRef(new Map<string, AbortController>());
+  // Full-size images for this session only (keyed by user message id). History keeps thumbnails.
+  const imagePayloads = useRef(new Map<string, CloudImage[]>());
   const [busy, setBusy] = useState<Record<string, boolean>>({});
   const isBusy = useCallback((id: string) => !!busy[id], [busy]);
 
@@ -261,14 +287,20 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             input: userMsg.content,
             attachment: userMsg.hiddenContext,
             mode: userMsg.mode ?? "ask",
+            images: imagePayloads.current.get(userMsg.id),
             context: settingsRef.current.context,
             history,
             signal: ctrl.signal,
           },
           { ...engineRef.current, kind },
         );
+        let noticeShown = false;
         for await (const ev of gen) {
           if (ev.type === "text") {
+            if (noticeShown) {
+              noticeShown = false;
+              patchMsg(chatId, assistantId, { notice: undefined });
+            }
             content += ev.delta;
             // Throttle UI updates to ~25 fps
             if (performance.now() - last > 40) flush();
@@ -286,6 +318,13 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
                 return { ...m, steps };
               }),
             }));
+          } else if (ev.type === "rewind") {
+            // OLIS Cloud switched engine mid-answer: drop the partial text
+            content = content.slice(0, ev.to);
+            flush();
+          } else if (ev.type === "notice") {
+            noticeShown = true;
+            patchMsg(chatId, assistantId, { notice: ev.kind });
           } else if (ev.type === "sources") {
             patchMsg(chatId, assistantId, { sources: ev.sources });
           } else if (ev.type === "suggestions") {
@@ -298,14 +337,14 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           }
         }
         finish();
-        patchMsg(chatId, assistantId, { content, status: "done" });
+        patchMsg(chatId, assistantId, { content, status: "done", notice: undefined });
       } catch (e) {
         finish();
-        if (isAbort(e)) patchMsg(chatId, assistantId, { content, status: "stopped" });
+        if (isAbort(e)) patchMsg(chatId, assistantId, { content, status: "stopped", notice: undefined });
         else {
           const msg = e instanceof OlisError ? e.message : "Something went wrong while generating a response. Please try again.";
           if (!(e instanceof OlisError)) console.error("[OLIS]", e);
-          patchMsg(chatId, assistantId, { content, status: "error", error: msg });
+          patchMsg(chatId, assistantId, { content, status: "error", error: msg, notice: undefined });
         }
       } finally {
         controllers.current.delete(chatId);
@@ -338,15 +377,17 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         createdAt: now,
         mode: input.mode,
         attachment: input.attachment ? { name: input.attachment.name, chars: input.attachment.text.length } : undefined,
+        images: input.images?.length ? input.images.map((i) => ({ name: i.name, thumb: i.thumb })) : undefined,
         hiddenContext: input.attachment ? `Attached file "${input.attachment.name}":\n\n${input.attachment.text}` : undefined,
       };
+      if (input.images?.length) imagePayloads.current.set(userMsg.id, input.images.map((i) => ({ mimeType: i.mimeType, data: i.data })));
       const assistant: Message = { id: uid(), role: "assistant", content: "", createdAt: now + 1, status: "thinking", mode: input.mode };
       const history = existing.messages;
       const id = chatId;
       assistant.engine = engineRef.current.kind;
       patchChat(id, (c) => ({
         ...c,
-        title: c.messages.length === 0 && !c.titleEdited ? titleFrom(input.text || input.attachment?.name || "New chat") : c.title,
+        title: c.messages.length === 0 && !c.titleEdited ? titleFrom(input.text || input.attachment?.name || (input.images?.length ? "Photo question" : "New chat")) : c.title,
         updatedAt: now,
         messages: [...c.messages, userMsg, assistant],
       }));
@@ -420,6 +461,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     settings,
     updateSettings,
     setContext,
+    setProfile,
     resolvedTheme,
     engine,
     engineLabel,

@@ -10,6 +10,7 @@ import { EcosystemMap } from "../components/orbix/EcosystemMap";
 import { ConnectPanel } from "../components/orbix/ConnectPanel";
 import { WorkspacePreview } from "../components/orbix/WorkspacePreview";
 import { DemoBadge, StatusTag } from "../components/orbix/bits";
+import { EcosystemActions } from "../components/orbix/EcosystemActions";
 import { LAYERS, MODES, ORBIX_URL, type AppId, type WorkspaceAction } from "../components/orbix/data";
 
 function Section({ eyebrow, title, body, children, className }: { eyebrow: string; title: string; body?: string; children: React.ReactNode; className?: string }) {
@@ -73,6 +74,11 @@ export function OrbixView({ navigate }: { navigate: (r: Route) => void }) {
       <div className="mt-12 animate-rise [animation-delay:80ms]">
         <EcosystemMap connected={connected} />
       </div>
+
+      {/* What works today */}
+      <Section eyebrow="Today" title="What OLIS can already do" body="Clearly labelled: available now, beta, or coming soon.">
+        <EcosystemActions navigate={navigate} />
+      </Section>
 
       {/* Connect */}
       <Section

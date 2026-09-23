@@ -5,6 +5,8 @@ import { CREATOR, OlisLockup } from "../components/Brand";
 import { AIcon, HoverAnimate } from "../components/AnimatedIcon";
 import { Icon, type IconName } from "../components/Icon";
 import { cx } from "../lib/utils";
+import { StudyProfileEditor } from "../components/StudyProfile";
+import { DeveloperPanel } from "../components/DeveloperPanel";
 import type { Chat, Theme } from "../types";
 
 function Section({ title, desc, children }: { title: string; desc?: string; children: ReactNode }) {
@@ -54,7 +56,7 @@ export function SettingsView() {
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6 sm:py-14">
-      <PageHeader eyebrow="Settings" title="Settings" subtitle="Your chats and settings stay in this browser. No account needed." />
+      <PageHeader eyebrow="Settings" title="Settings" subtitle="Your chats, settings and study profile stay in this browser. No account needed." />
 
       <div className="space-y-4">
         <Section title="Appearance" desc="Dark mode is designed for long, calm study sessions.">
@@ -71,7 +73,11 @@ export function SettingsView() {
           <ContextBar compact />
         </Section>
 
-        <Section title="Intelligence engine" desc="What powers OLIS. Both cost $0. API keys live on the server and never reach your browser.">
+        <Section title="Study profile" desc="Tell OLIS how you learn. It uses this to pitch explanations and focus on the topics you find hard.">
+          <StudyProfileEditor />
+        </Section>
+
+        <Section title="Intelligence engine" desc="What powers OLIS. OLIS Beta is free to use, and API keys stay on the server, never in your browser.">
           <div className="grid gap-3 sm:grid-cols-2">
             {(
               [
@@ -79,7 +85,7 @@ export function SettingsView() {
                   id: "cloud",
                   title: "OLIS Cloud",
                   badge: "Research agent · recommended",
-                  body: "Gemini + OLIS study notes (RAG) + Wikipedia and trusted web research, with cited sources.",
+                  body: "Several AI engines with automatic switching, plus OLIS study notes, Wikipedia and trusted web research, with cited sources.",
                 },
                 { id: "demo", title: "Offline engine", badge: "No internet needed", body: "Built-in lessons, step-by-step solver, quiz bank and planner. Also the automatic fallback." },
               ] as const
@@ -122,12 +128,17 @@ export function SettingsView() {
             </div>
             {cloud.status === "ready" && cloud.health ? (
               <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-muted">
-                <dt className="text-faint">Model</dt>
-                <dd className="font-mono text-[12px] text-ink">{cloud.health.model}</dd>
+                <dt className="text-faint">AI engines</dt>
+                <dd>
+                  {cloud.health.engines?.busy
+                    ? "Busy right now (free beta limits). Try again in a minute."
+                    : `${cloud.health.engines?.engines ?? 1} ready · OLIS switches automatically if one is busy`}
+                </dd>
                 <dt className="text-faint">Knowledge base</dt>
                 <dd>
                   {cloud.health.knowledge.files} documents · {cloud.health.knowledge.chunks} passages ·{" "}
                   {cloud.health.knowledge.semantic ? "semantic + keyword search" : "keyword search"}
+                  {cloud.health.knowledge.pastPaperChunks ? ` · ${cloud.health.knowledge.pastPaperChunks} past-paper passages` : ""}
                 </dd>
                 <dt className="text-faint">Research</dt>
                 <dd>
@@ -138,10 +149,13 @@ export function SettingsView() {
             ) : cloud.status === "unavailable" ? (
               <p className="mt-2 leading-relaxed text-muted">
                 {cloud.health && !cloud.health.ok
-                  ? "The server is running but GEMINI_API_KEY isn't set in Vercel's Environment Variables yet."
+                  ? "The server is running but no AI provider key (e.g. GEMINI_API_KEY) is set in Vercel's Environment Variables yet."
                   : "The OLIS backend isn't running here (e.g. plain static hosting or offline). OLIS is using the offline engine."}
               </p>
             ) : null}
+          </div>
+          <div className="mt-3">
+            <DeveloperPanel />
           </div>
         </Section>
 
@@ -166,7 +180,7 @@ export function SettingsView() {
         <Section title="About">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <OlisLockup size="md" />
-            <code className="font-mono text-xs text-faint">v0.2 · beta model</code>
+            <code className="font-mono text-xs text-faint">v0.3 · beta</code>
           </div>
           <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface-2 px-4 py-3">
             <div className="text-[13px]">
@@ -203,7 +217,7 @@ export function SettingsView() {
       <ConfirmDialog
         open={confirm === "reset"}
         title="Reset settings?"
-        body="Theme, learning context and engine choice go back to defaults. Your chats are kept."
+        body="Theme, learning context, study profile and engine choice go back to defaults. Your chats are kept."
         confirmLabel="Reset"
         onConfirm={() => {
           updateSettings({ ...DEFAULT_SETTINGS });

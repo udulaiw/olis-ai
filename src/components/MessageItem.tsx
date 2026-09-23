@@ -29,6 +29,13 @@ export const MessageItem = memo(function MessageItem({ chatId, msg, isLastAssist
     return (
       <div className="flex justify-end animate-rise">
         <div className="max-w-[85%] sm:max-w-[75%]">
+          {msg.images && msg.images.length > 0 && (
+            <div className="mb-1.5 flex justify-end gap-1.5">
+              {msg.images.map((img, i) => (
+                <img key={i} src={img.thumb} alt={img.name} title={img.name} className="h-20 w-20 rounded-2xl border border-line object-cover sm:h-24 sm:w-24" />
+              ))}
+            </div>
+          )}
           {msg.attachment && (
             <div className="mb-1.5 flex justify-end">
               <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-2.5 py-1 text-xs text-muted">
@@ -77,10 +84,17 @@ export const MessageItem = memo(function MessageItem({ chatId, msg, isLastAssist
 
         {msg.steps && msg.steps.length > 0 && <AgentSteps steps={msg.steps} working={thinking || streaming} />}
 
-        {thinking && !runningStep && (
+        {working && msg.notice === "switching" ? (
           <div className="py-1 text-sm text-muted animate-fade" role="status">
-            <span className="shimmer-text">{thinkingLabel}</span>
+            <span className="shimmer-text">OLIS is switching to another AI engine. One moment…</span>
           </div>
+        ) : (
+          thinking &&
+          !runningStep && (
+            <div className="py-1 text-sm text-muted animate-fade" role="status">
+              <span className="shimmer-text">{thinkingLabel}</span>
+            </div>
+          )
         )}
 
         {msg.content && <Markdown content={msg.content} streaming={streaming} sources={msg.sources} />}

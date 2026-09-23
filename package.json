@@ -1,6 +1,6 @@
 {
   "name": "olis-ai-beta",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "OLIS AI Beta — Orbix Learning Intelligence System. A free-to-run AI learning workspace prototype.",
   "type": "module",
@@ -10,7 +10,8 @@
     "vercel-build": "node scripts/build-index.mjs && npm run build",
     "index": "node scripts/build-index.mjs",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:ai": "node scripts/test-ai.mjs"
   },
   "dependencies": {
     "katex": "^0.18.7",

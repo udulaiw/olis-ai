@@ -1,4 +1,4 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState, type KeyboardEvent } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState, type ClipboardEvent, type KeyboardEvent } from "react";
 import type { Mode } from "../types";
 import { MODE_META } from "../services/intent";
 import { useStore, type SendInput } from "../store/AppStore";
@@ -6,6 +6,7 @@ import { Icon, type IconName } from "./Icon";
 import { AIcon, HoverAnimate } from "./AnimatedIcon";
 import { Orb } from "./Orb";
 import { cx } from "../lib/utils";
+import { IMAGE_ACCEPT, isImageFile, prepareImage, type PreparedImage } from "../lib/image";
 
 const QUICK: { mode: Exclude<Mode, "ask" | "simplify">; icon: IconName }[] = [
   { mode: "explain", icon: "lightbulb" },
@@ -16,6 +17,7 @@ const QUICK: { mode: Exclude<Mode, "ask" | "simplify">; icon: IconName }[] = [
 ];
 
 const MAX_ATTACH = 60_000;
+const MAX_IMAGES = 2;
 
 // Minimal typing for the Web Speech API (not in lib.dom for all TS versions)
 interface SpeechRec {
@@ -51,6 +53,8 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ on
   const [text, setText] = useState("");
   const [mode, setMode] = useState<Mode>("ask");
   const [attachment, setAttachment] = useState<{ name: string; text: string } | null>(null);
+  const [images, setImages] = useState<PreparedImage[]>([]);
+  const [preparing, setPreparing] = useState(false);
   const [listening, setListening] = useState(false);
   const ta = useRef<HTMLTextAreaElement>(null);
   const file = useRef<HTMLInputElement>(null);
@@ -84,14 +88,15 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ on
   // Stop the mic if the component unmounts
   useEffect(() => () => rec.current?.stop(), []);
 
-  const canSend = !busy && (text.trim().length > 0 || !!attachment);
+  const canSend = !busy && !preparing && (text.trim().length > 0 || !!attachment || images.length > 0);
 
   const submit = () => {
     if (!canSend) return;
     if (listening) rec.current?.stop();
-    onSend({ text: text.trim(), mode, attachment: attachment ?? undefined });
+    onSend({ text: text.trim(), mode, attachment: attachment ?? undefined, images: images.length ? images : undefined });
     setText("");
     setAttachment(null);
+    setImages([]);
     setMode("ask");
   };
 
@@ -120,11 +125,45 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ on
     });
   };
 
-  const onFile = async (f: File | undefined) => {
+  const addImages = async (files: File[]) => {
+    const room = MAX_IMAGES - images.length;
+    if (room <= 0) {
+      toast(`You can attach up to ${MAX_IMAGES} images per message.`, "error");
+      return;
+    }
+    if (files.length > room) toast(`Only the first ${room} image${room > 1 ? "s" : ""} will be attached.`);
+    setPreparing(true);
+    try {
+      const prepared: PreparedImage[] = [];
+      for (const f of files.slice(0, room)) prepared.push(await prepareImage(f, f.name || "Pasted image"));
+      setImages((cur) => [...cur, ...prepared].slice(0, MAX_IMAGES));
+      ta.current?.focus();
+    } catch {
+      toast("Couldn't read that image. Try a JPEG or PNG.", "error");
+    } finally {
+      setPreparing(false);
+    }
+  };
+
+  const onPaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
+    const files = Array.from(e.clipboardData.files).filter(isImageFile);
+    if (!files.length) return;
+    e.preventDefault();
+    void addImages(files);
+  };
+
+  const onFile = async (list: FileList | null | undefined) => {
+    const all = Array.from(list ?? []);
+    const imgs = all.filter(isImageFile);
+    if (imgs.length) {
+      await addImages(imgs);
+      return;
+    }
+    const f = all[0];
     if (!f) return;
     const okType = /\.(txt|md|markdown|csv|json|tex)$/i.test(f.name) || f.type.startsWith("text/");
     if (!okType) {
-      toast("OLIS Beta can read text files (.txt, .md, .csv) for now. PDF and image support are coming later.", "error");
+      toast("OLIS Beta reads photos (JPEG, PNG, WebP) and text files (.txt, .md, .csv). PDF support is coming later.", "error");
       return;
     }
     try {
@@ -193,7 +232,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ on
           variant === "hero" && "shadow-pop",
         )}
       >
-        {(attachment || mode !== "ask") && (
+        {(attachment || images.length > 0 || preparing || mode !== "ask") && (
           <div className="flex flex-wrap items-center gap-2 px-2 pt-1">
             {mode !== "ask" && (
               <span className="inline-flex items-center gap-1.5 rounded-full bg-accent-soft px-2.5 py-1 text-xs font-medium text-accent">
@@ -203,6 +242,16 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ on
                 </button>
               </span>
             )}
+            {images.map((img, i) => (
+              <span key={i} className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface-2 py-0.5 pl-0.5 pr-2.5 text-xs text-muted">
+                <img src={img.thumb} alt="" className="h-6 w-6 rounded-full object-cover" />
+                <span className="max-w-[9rem] truncate">{img.name}</span>
+                <button onClick={() => setImages((cur) => cur.filter((_, j) => j !== i))} aria-label={`Remove ${img.name}`} className="hover:text-ink">
+                  <Icon name="x" size={12} strokeWidth={2.2} />
+                </button>
+              </span>
+            ))}
+            {preparing && <span className="text-xs text-faint">Preparing image…</span>}
             {attachment && (
               <span className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-line bg-surface-2 px-2.5 py-1 text-xs text-muted">
                 <Icon name="file" size={13} />
@@ -222,6 +271,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ on
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={onKey}
+          onPaste={onPaste}
           placeholder={placeholder}
           aria-label="Message OLIS"
           className={cx(
@@ -231,9 +281,19 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ on
         />
 
         <div className="flex items-center gap-1 px-1">
-          <input ref={file} type="file" className="hidden" accept=".txt,.md,.markdown,.csv,.json,.tex,text/*" onChange={(e) => { void onFile(e.target.files?.[0]); e.target.value = ""; }} />
+          <input
+            ref={file}
+            type="file"
+            multiple
+            className="hidden"
+            accept={`${IMAGE_ACCEPT},.txt,.md,.markdown,.csv,.json,.tex,text/*`}
+            onChange={(e) => {
+              void onFile(e.target.files);
+              e.target.value = "";
+            }}
+          />
           <HoverAnimate>
-            <button className="icon-btn" onClick={() => file.current?.click()} title="Attach a text file" aria-label="Attach a text file">
+            <button className="icon-btn" onClick={() => file.current?.click()} title="Attach a photo or text file" aria-label="Attach a photo or text file">
               <AIcon name="attach" />
             </button>
           </HoverAnimate>

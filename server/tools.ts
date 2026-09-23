@@ -1,10 +1,10 @@
 // The OLIS agent's tools. Each returns text for the model plus
 // structured sources for the UI (numbered so the model can cite [n]).
 import type { Config } from "./config.js";
-import type { FunctionDeclaration } from "./gemini.js";
+import type { ToolDef } from "./ai/types.js";
 import { searchKnowledge } from "./rag.js";
 
-export type SourceKind = "notes" | "wikipedia" | "web";
+export type SourceKind = "notes" | "paper" | "wikipedia" | "web";
 export interface Source {
   ref: number;
   kind: SourceKind;
@@ -34,13 +34,26 @@ const t = (ms: number) => AbortSignal.timeout(ms);
 const sig = (ms: number, outer?: AbortSignal) => (outer ? AbortSignal.any([outer, t(ms)]) : t(ms));
 const clip = (s: string, n: number) => (s.length > n ? s.slice(0, n).trimEnd() + "…" : s);
 
-export function toolDeclarations(cfg: Config): FunctionDeclaration[] {
-  const decls: FunctionDeclaration[] = [
+export function toolDeclarations(cfg: Config): ToolDef[] {
+  const decls: ToolDef[] = [
     {
       name: "search_knowledge_base",
       description:
         "Search OLIS's curated study notes (A-Level Physics, Chemistry, Combined Mathematics, Biology, study skills and any syllabus material added by the admin). Use this FIRST for curriculum questions. Returns numbered excerpts.",
       parameters: { type: "object", properties: { query: { type: "string", description: "What to look up, in plain words" } }, required: ["query"] },
+    },
+    {
+      name: "search_past_papers",
+      description:
+        "Search the Sri Lankan A/L past-paper questions and marking schemes that have been added to OLIS. Use for questions about past papers, exam patterns, how marks are awarded, or to find real questions on a topic. Returns only real, indexed questions; if none are found, say so and never invent one.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Topic or question text to look for" },
+          year: { type: "string", description: "Optional exam year, e.g. 2023" },
+        },
+        required: ["query"],
+      },
     },
     {
       name: "search_wikipedia",
@@ -95,6 +108,38 @@ export async function runTool(
       };
     }
 
+    case "search_past_papers": {
+      const year = typeof args.year === "string" && /^\d{4}$/.test(args.year) ? args.year : undefined;
+      const hits = await searchKnowledge(cfg, q, { k: 4, subject: ctx.subject, signal: ctx.signal, types: ["past_paper", "marking_scheme"], year });
+      const sources = hits.map((h) =>
+        reg.add({
+          kind: "paper",
+          title: [h.chunk.title, h.chunk.year, h.chunk.paper, h.chunk.question ? `Q${h.chunk.question}` : ""].filter(Boolean).join(" · "),
+          url: h.chunk.url,
+          snippet: clip(h.chunk.text.split("\n\n").slice(1).join(" "), 180),
+        }),
+      );
+      return {
+        label: hits.length ? `Found ${hits.length} past-paper item${hits.length > 1 ? "s" : ""}` : "No matching past-paper questions yet",
+        sources,
+        result: hits.length
+          ? {
+              results: hits.map((h, i) => ({
+                ref: sources[i].ref,
+                type: h.chunk.type,
+                subject: h.chunk.subject,
+                year: h.chunk.year,
+                paper: h.chunk.paper,
+                question: h.chunk.question,
+                unit: h.chunk.unit,
+                marks: h.chunk.marks,
+                text: clip(h.chunk.text, 1600),
+              })),
+            }
+          : { results: [], note: "No past-paper questions on this are in OLIS yet. Tell the student honestly. Do NOT invent past-paper questions, years or marking schemes." },
+      };
+    }
+
     case "search_wikipedia": {
       const url = `${cfg.wikipediaBase}/w/api.php?action=query&format=json&origin=*&generator=search&gsrsearch=${encodeURIComponent(q)}&gsrlimit=3&prop=extracts|info&exintro=1&explaintext=1&exchars=1200&inprop=url`;
       const res = await fetch(url, { headers: { "User-Agent": UA }, signal: sig(8000, ctx.signal) });
@@ -146,6 +191,16 @@ export async function runTool(
       try {
         const res = await fetch(url, { headers: { "User-Agent": UA, Accept: "text/html,text/plain" }, signal: sig(9000, ctx.signal), redirect: "follow" });
         if (!res.ok) return { label: `Reading ${host}`, sources: [], result: { error: `Page unavailable (${res.status})` } };
+        // A redirect must not lead somewhere OLIS wouldn't have fetched directly
+        const finalHost = (() => {
+          try {
+            return new URL(res.url || url).hostname;
+          } catch {
+            return "";
+          }
+        })();
+        if (finalHost !== host && !cfg.trustedDomains.some((d) => finalHost === d || finalHost.endsWith("." + d)))
+          return { label: `Reading ${host}`, sources: [], result: { error: "The page redirected to an untrusted site." } };
         const html = (await res.text()).slice(0, 400_000);
         const title = html.match(/<title[^>]*>([^<]*)<\/title>/i)?.[1]?.trim() || host;
         const text = html

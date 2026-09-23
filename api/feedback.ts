@@ -9,6 +9,9 @@ const str = (v: unknown, max: number) => (typeof v === "string" ? v.slice(0, max
 export async function POST(request: Request): Promise<Response> {
   const cfg = config();
   const g = await guard(request, cfg, "feedback", { limit: 60, maxBytes: 40_000 });
+  // Feedback is opt-in (the student pressed 👍/👎). The full Q&A only goes to the
+  // webhook, if one is set. Vercel logs get metadata plus short excerpts, so
+  // student conversations don't pile up in logs.
   if (g instanceof Response) return g;
   const b = (g.body ?? {}) as Record<string, unknown>;
   const rating = b.rating === "up" || b.rating === "down" ? b.rating : null;
@@ -26,7 +29,15 @@ export async function POST(request: Request): Promise<Response> {
     sources: Array.isArray(b.sources) ? (b.sources as unknown[]).slice(0, 12) : [],
     engine: str(b.engine, 20),
   };
-  console.log(JSON.stringify(record));
+  console.log(
+    JSON.stringify({
+      ...record,
+      question: record.question.slice(0, 160),
+      answer: cfg.feedbackWebhook ? `[${record.answer.length} chars → webhook]` : record.answer.slice(0, 400),
+      comment: record.comment.slice(0, 200),
+      sources: record.sources.length,
+    }),
+  );
 
   if (cfg.feedbackWebhook) {
     try {

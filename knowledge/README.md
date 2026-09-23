@@ -25,6 +25,22 @@ notes **before** it goes to Wikipedia or the web, and cites them as sources.
 
 Run `npm run index` locally to rebuild the index yourself.
 
+## Structure
+
+```
+knowledge/
+  combined-mathematics/ physics/ chemistry/ biology/ general/   ← study notes (type: notes)
+  syllabus/<subject>/        ← official syllabus text (type: syllabus)      see syllabus/README.md
+  past-papers/<subject>/     ← one past-paper question per file (type: past_paper)  see past-papers/README.md
+```
+
+Optional frontmatter fields on any file: `type` (`notes`, `syllabus`,
+`past_paper`, `marking_scheme`, `resource`), `unit` (a unit ID from
+`server/knowledge/taxonomy.ts`), `year`, `paper`, `question`, `question_type`,
+`difficulty`, `marks`, `language` (`en` / `si`), `verified` (`true` / `false`).
+Files and folders starting with `_` are skipped (templates, drafts).
+Sinhala notes are fine: Sinhala words are searchable too.
+
 ## What to add first (highest value)
 - Syllabus topic lists and learning outcomes (NIE / DoE A/L syllabus)
 - Your own concise notes per unit
