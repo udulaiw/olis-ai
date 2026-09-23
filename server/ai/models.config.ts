@@ -94,6 +94,15 @@ export function catalog(): ModelSpec[] {
       dailyBudget: 300,
     },
     {
+      key: "nvidia-nemotron",
+      provider: "nvidia",
+      model: env("NVIDIA_NEMOTRON_MODEL") || "nvidia/nemotron-3-super-120b-a12b",
+      tier: "free",
+      capabilities: ["text", "json", "reasoning", "multilingual"],
+      contextTokens: 128_000,
+      dailyBudget: 200,
+    },
+    {
       key: "nvidia-vision",
       provider: "nvidia",
       model: env("NVIDIA_VISION_MODEL") || "meta/llama-3.2-90b-vision-instruct",
@@ -122,14 +131,14 @@ export function catalog(): ModelSpec[] {
 // configured, that lack a required capability, are cooling down after a
 // rate limit, or are blocked by Free Beta are skipped automatically.
 export const ROUTES: Record<Task, string[]> = {
-  general: ["gemini-fast", "gemini-reasoning", "gemini-backup", "nvidia-fast", "nvidia-reasoning", "local"],
-  reasoning: ["gemini-reasoning", "gemini-backup", "nvidia-reasoning", "gemini-fast", "local"],
-  mathematics: ["gemini-reasoning", "gemini-backup", "nvidia-reasoning", "gemini-fast", "local"],
-  physics: ["gemini-reasoning", "gemini-backup", "nvidia-reasoning", "gemini-fast", "local"],
-  chemistry: ["gemini-reasoning", "gemini-fast", "gemini-backup", "nvidia-reasoning", "local"],
+  general: ["gemini-fast", "gemini-reasoning", "gemini-backup", "nvidia-fast", "nvidia-reasoning", "nvidia-nemotron", "local"],
+  reasoning: ["gemini-reasoning", "gemini-backup", "nvidia-reasoning", "nvidia-nemotron", "gemini-fast", "local"],
+  mathematics: ["gemini-reasoning", "gemini-backup", "nvidia-reasoning", "nvidia-nemotron", "gemini-fast", "local"],
+  physics: ["gemini-reasoning", "gemini-backup", "nvidia-reasoning", "nvidia-nemotron", "gemini-fast", "local"],
+  chemistry: ["gemini-reasoning", "gemini-fast", "gemini-backup", "nvidia-reasoning", "nvidia-nemotron", "local"],
   vision: ["gemini-reasoning", "gemini-fast", "gemini-backup", "nvidia-vision"],
-  sinhala: ["gemini-reasoning", "gemini-fast", "gemini-backup", "nvidia-reasoning"],
-  long_context: ["gemini-fast", "gemini-reasoning", "gemini-backup", "nvidia-reasoning"],
+  sinhala: ["gemini-reasoning", "gemini-fast", "gemini-backup", "nvidia-reasoning", "nvidia-nemotron"],
+  long_context: ["gemini-fast", "gemini-reasoning", "gemini-backup", "nvidia-reasoning", "nvidia-nemotron"],
   structured: ["gemini-fast", "gemini-reasoning", "gemini-backup", "nvidia-fast", "nvidia-reasoning", "local"],
 };
 

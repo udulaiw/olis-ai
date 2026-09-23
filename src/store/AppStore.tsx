@@ -154,7 +154,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   // Students see "OLIS Cloud", not provider/model names
   const engineLabel =
     effectiveKind === "cloud"
-      ? health?.engines?.busy
+      ? health?.busy
         ? "OLIS Cloud · busy"
         : "OLIS Cloud"
       : settings.engine === "cloud" && cloudStatus === "checking"

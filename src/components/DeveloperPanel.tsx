@@ -33,11 +33,11 @@ export function DeveloperPanel() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const load = async () => {
+  const load = async (probe = false) => {
     if (!token.trim()) return;
     setLoading(true);
     setError("");
-    const r = await providerHealth(token.trim());
+    const r = await providerHealth(token.trim(), { probe });
     setLoading(false);
     if ("error" in r) {
       setData(null);
@@ -52,17 +52,20 @@ export function DeveloperPanel() {
         <Icon name="chevronDown" size={14} className="ml-auto transition-transform group-open:rotate-180" />
       </summary>
       <div className="mt-3 space-y-3">
-        <p className="text-[12px] text-faint">For the OLIS admin. Needs the server's OLIS_ADMIN_TOKEN. The token isn't saved.</p>
+        <p className="text-[12px] text-faint">For the OLIS admin only. The token isn't saved.</p>
         <form
-          className="flex gap-2"
+          className="flex flex-wrap gap-2"
           onSubmit={(e) => {
             e.preventDefault();
             void load();
           }}
         >
-          <input type="password" autoComplete="off" className="field !py-1.5 text-sm" placeholder="Admin token" value={token} onChange={(e) => setToken(e.target.value)} aria-label="Admin token" />
+          <input type="password" autoComplete="off" className="field !w-auto min-w-[10rem] flex-1 !py-1.5 text-sm" placeholder="Admin token" value={token} onChange={(e) => setToken(e.target.value)} aria-label="Admin token" />
           <button className="btn btn-secondary !py-1.5" disabled={!token.trim() || loading}>
             {loading ? <Spinner /> : <Icon name="refresh" size={14} />} Check
+          </button>
+          <button type="button" className="btn btn-secondary !py-1.5 whitespace-nowrap" disabled={!token.trim() || loading} onClick={() => void load(true)} title="Sends one tiny request to every engine">
+            <Icon name="activity" size={14} /> Test all
           </button>
         </form>
         {error && <p className="text-danger">{error}</p>}
@@ -74,6 +77,24 @@ export function DeveloperPanel() {
               </span>
               <span>Limits store: {data.limitsStore}</span>
             </div>
+            {data.probe && (
+              <div className="overflow-hidden rounded-xl border border-line">
+                <div className="bg-surface px-3 py-2 font-medium">Connection test</div>
+                <ul className="divide-y divide-line">
+                  {data.probe.map((r) => (
+                    <li key={r.key} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
+                      <code className="min-w-0 flex-1 truncate font-mono text-[11.5px]">{r.model}</code>
+                      <span className="text-[11px] text-faint">
+                        {(r.ms / 1000).toFixed(1)}s{r.ok ? "" : ` · ${r.error}${r.status ? ` ${r.status}` : ""}`}
+                      </span>
+                      <Status s={r.ok ? "healthy" : "down"} />
+                      {!r.ok && r.detail && <span className="w-full text-[11px] text-faint">{r.detail}</span>}
+                    </li>
+                  ))}
+                  {data.probe.length === 0 && <li className="px-3 py-2 text-faint">No engines configured.</li>}
+                </ul>
+              </div>
+            )}
             {data.providers.map((p) => (
               <div key={p.id} className="overflow-hidden rounded-xl border border-line">
                 <div className="flex items-center justify-between gap-2 bg-surface px-3 py-2">
@@ -96,7 +117,13 @@ export function DeveloperPanel() {
                 </ul>
               </div>
             ))}
-            <p className="text-[11px] text-faint">Health is tracked per server instance and resets when Vercel starts a new one.</p>
+            {data.knowledge && (
+              <p className="text-[12px] text-faint">
+                Knowledge: {data.knowledge.files} files · {data.knowledge.chunks} passages · {data.knowledge.semantic ? "semantic + keyword" : "keyword only"} search
+                {data.knowledge.pastPaperChunks ? ` · ${data.knowledge.pastPaperChunks} past-paper passages` : ""}
+              </p>
+            )}
+            <p className="text-[11px] text-faint">Health is tracked per server instance and resets when a new one starts.</p>
           </div>
         )}
       </div>

@@ -79,7 +79,7 @@ export class OpenAICompatibleProvider implements AIProvider {
     let produced = false;
     for await (const payload of sseData(res.body)) {
       let json: {
-        choices?: { delta?: { content?: string | null }; finish_reason?: string | null }[];
+        choices?: { delta?: { content?: string | null; reasoning_content?: string | null; reasoning?: string | null }; finish_reason?: string | null }[];
         usage?: { prompt_tokens?: number; completion_tokens?: number };
         error?: { message?: string; code?: number | string };
       };
@@ -90,13 +90,14 @@ export class OpenAICompatibleProvider implements AIProvider {
       }
       if (json.error) throw new ProviderError(String(json.error.code) === "429" ? "rate_limit" : "server", this.id, json.error.message?.slice(0, 140) ?? "stream error");
       const choice = json.choices?.[0];
+      if (choice?.delta?.reasoning_content || choice?.delta?.reasoning) yield { type: "keepalive" };
       const delta = choice?.delta?.content;
       if (delta) {
         const visible = strip(delta);
         if (visible) {
           produced = true;
           yield { type: "text", delta: visible };
-        }
+        } else yield { type: "keepalive" };
       }
       if (choice?.finish_reason === "content_filter" && !produced) throw new ProviderError("blocked", this.id, "Blocked by content filter");
       if (json.usage) yield { type: "usage", usage: { inputTokens: json.usage.prompt_tokens, outputTokens: json.usage.completion_tokens } };

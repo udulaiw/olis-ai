@@ -7,10 +7,11 @@ import { Sidebar } from "./components/Sidebar";
 import { Toasts } from "./components/ui";
 import { Icon, OlisMark } from "./components/Icon";
 import { HomeView } from "./pages/HomeView";
-import { ChatView } from "./pages/ChatView";
 import { Orb } from "./components/Orb";
 
 // Secondary pages load on demand so the first paint (home/chat) stays light.
+// Chat pulls in the Markdown + KaTeX renderer (most of the JS), so it loads on demand too.
+const ChatView = lazy(() => import("./pages/ChatView").then((m) => ({ default: m.ChatView })));
 const HistoryView = lazy(() => import("./pages/HistoryView").then((m) => ({ default: m.HistoryView })));
 const ToolsView = lazy(() => import("./pages/ToolsView").then((m) => ({ default: m.ToolsView })));
 const OrbixView = lazy(() => import("./pages/OrbixView").then((m) => ({ default: m.OrbixView })));
@@ -30,6 +31,14 @@ function Shell() {
     const titles: Record<string, string> = { home: "OLIS AI · Beta", chat: "Chat · OLIS", history: "History · OLIS", tools: "Study Tools · OLIS", settings: "Settings · OLIS", orbix: "OLIS × ORBIX" };
     document.title = titles[route.name];
   }, [route.name]);
+
+  // Warm up the chat code while the browser is idle, so opening a chat is instant
+  useEffect(() => {
+    const warm = () => void import("./pages/ChatView");
+    const w = window as Window & { requestIdleCallback?: (cb: () => void) => number };
+    if (w.requestIdleCallback) w.requestIdleCallback(warm);
+    else setTimeout(warm, 1500);
+  }, []);
 
   const isChat = route.name === "chat";
 
@@ -55,8 +64,8 @@ function Shell() {
 
         <main className={isChat ? "flex min-h-0 flex-1 flex-col" : "min-h-0 flex-1 overflow-y-auto"}>
           {route.name === "home" && <HomeView navigate={navigate} />}
-          {route.name === "chat" && <ChatView id={route.id} navigate={navigate} />}
           <Suspense fallback={<PageFallback />}>
+            {route.name === "chat" && <ChatView id={route.id} navigate={navigate} />}
             {route.name === "history" && <HistoryView navigate={navigate} />}
             {route.name === "tools" && <ToolsView tool={route.tool} navigate={navigate} />}
             {route.name === "settings" && <SettingsView />}

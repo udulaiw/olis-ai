@@ -10,6 +10,7 @@ export default defineConfig({
     alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
   },
   build: {
+    sourcemap: false, // never ship source maps (keeps server paths and code structure private)
     // KaTeX (math rendering) is most of the bundle; ~230 kB gzipped total is fine for this app.
     chunkSizeWarningLimit: 800,
   },

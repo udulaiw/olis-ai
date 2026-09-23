@@ -15,7 +15,7 @@ Browser (React, no keys)          Vercel Functions (/api)                       
 Chat / Tools / Settings ─POST─▶  /api/agent ─▶ guard ─▶ classify ─▶ RAG ─▶ AI router ─┬─▶ Google Gemini (primary)
    language · profile    ◀─SSE─   steps, sources, text, rewind, notice               ├─▶ NVIDIA (optional)
    photos (downsized)             /api/generate  quiz & flashcards (JSON, same router) └─▶ Local model (dev only)
-                                  /api/health    public status · ?detail=1 admin health
+                                  /api/health    public {ok,busy} only · ?detail=1 admin health (404 without token)
                                   /api/feedback  👍/👎 → logs / webhook
 ```
 
@@ -47,7 +47,7 @@ src/                      React app (services/olisEngine.ts is the only thing th
 | Provider | Role | Key | Notes |
 |---|---|---|---|
 | **Google Gemini** | Primary: all tasks, tools, photos, Sinhala | `GEMINI_API_KEY` from https://aistudio.google.com/apikey | Use a project **with billing OFF**. With billing on, Google bills even "free" models, and OLIS can't detect that. |
-| **NVIDIA** | Optional fallback (text, reasoning, vision) | `NVIDIA_API_KEY` from https://build.nvidia.com | ⚠ NVIDIA's free endpoints are for **development, testing and evaluation**, not production. Check their terms before enabling it on a public site. No tool calling (OLIS pre-fetches notes instead). |
+| **NVIDIA** | Optional fallback (DeepSeek, gpt-oss, Nemotron, Llama Vision) | `NVIDIA_API_KEY` from https://build.nvidia.com | ⚠ NVIDIA's free endpoints are for **development, testing and evaluation**, not production. Check their terms before enabling it on a public site. No tool calling (OLIS pre-fetches notes instead). |
 | **Local** | Optional, `npm run dev` only | `LOCAL_AI_BASE_URL` (e.g. Ollama `http://localhost:11434/v1`) | A Vercel function can't reach your computer. |
 
 With only `GEMINI_API_KEY` set, OLIS still falls back between three Gemini models, which have separate free quotas.
@@ -149,11 +149,12 @@ Every AI call logs one JSON line (Vercel → Logs):
 
 Never logged: API keys (also redacted from provider error text), prompts, answers, profiles. Feedback logs keep only short excerpts (the full text goes to your webhook, if set).
 
-**Provider health:** set `OLIS_ADMIN_TOKEN`, then open Settings → *Developer: AI engine health* (or `GET /api/health?detail=1` with header `x-olis-admin`). Students only ever see "OLIS Cloud" and an engine count.
+**Provider health:** set `OLIS_ADMIN_TOKEN`. In Settings, tap the **v0.3 · beta** label 5 times to reveal *Developer: AI engine health* (hidden from students), enter the token, and press **Test all** to send one tiny request to every configured engine: the quickest way to confirm a new key (e.g. NVIDIA) works. Same data: `GET /api/health?detail=1&probe=1` with header `x-olis-admin`. Without a valid token the endpoint answers 404, and the public `/api/health` returns only `{ok, busy}`.
 
 ## Security
 
-- All keys are server-side; the browser bundle calls only `/api/*`.
+- All keys are server-side; the browser bundle calls only `/api/*` and contains no key, provider name, model name or env var name. No source maps are shipped; the chat and admin code load on demand.
+- API responses are `no-store` and `noindex`; errors are generic ("OLIS Cloud isn't available right now") and never mention configuration.
 - POSTs must come from the OLIS origin (a POST without `Origin` is refused); rate limits, daily caps and size limits apply.
 - Every client field is validated and clipped (`server/sanitize.ts`). Profile text is stripped of markup characters.
 - Prompt injection: notes, attachments and tool results are fenced (`<knowledge_excerpts>`, `<student_document>`) and the model is told to treat them as data. `read_webpage` only fetches search results or trusted domains, and refuses redirects to untrusted hosts.

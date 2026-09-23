@@ -38,7 +38,7 @@ export async function POST(request: Request): Promise<Response> {
   if (g instanceof Response) return g;
   const req = parse(g.body);
   if (!req) return errorJson(400, "bad_request", "Send at least one user message (images: JPEG/PNG/WebP, max 2).");
-  if (!anyEngineConfigured("general")) return errorJson(503, "config", "OLIS Cloud isn't configured yet: no AI provider key is set on the server.");
+  if (!anyEngineConfigured("general")) return errorJson(503, "config", "OLIS Cloud isn't available right now.");
 
   return sseStream(async (send, signal) => {
     try {

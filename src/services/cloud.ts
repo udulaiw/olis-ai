@@ -31,11 +31,8 @@ export class OlisError extends Error {
 
 export interface CloudHealth {
   ok: boolean;
-  version: string;
-  /** How many AI engines are usable right now (names are deliberately not exposed). */
-  engines?: { engines: number; busy: boolean; freeBeta: boolean };
-  knowledge: { files: number; chunks: number; pastPaperChunks?: number; semantic: boolean; builtAt: string | null };
-  tools: { knowledgeBase: boolean; pastPapers?: boolean; wikipedia: boolean; webSearch: false | "trusted" | "open"; readPages: boolean; images?: boolean };
+  /** All AI engines are rate-limited right now. */
+  busy?: boolean;
 }
 
 /** Internal provider health (Settings → Developer, needs OLIS_ADMIN_TOKEN). */
@@ -48,6 +45,8 @@ export interface ProviderHealth {
     status: string;
     models: { key: string; model: string; status: string; cooldownSeconds?: number; successes: number; failures: number; lastError?: string; avgMs?: number; note?: string }[];
   }[];
+  probe?: { key: string; provider: string; model: string; ok: boolean; ms: number; error?: string; status?: number; detail?: string }[];
+  knowledge?: { files: number; chunks: number; pastPaperChunks?: number; semantic: boolean; builtAt: string | null };
 }
 
 export type CloudEvent =
@@ -168,11 +167,10 @@ export function sendFeedback(body: {
 }
 
 /** Internal provider health. Returns null on a wrong token or when disabled. */
-export async function providerHealth(token: string, signal?: AbortSignal): Promise<ProviderHealth | { error: string }> {
+export async function providerHealth(token: string, opts: { probe?: boolean; signal?: AbortSignal } = {}): Promise<ProviderHealth | { error: string }> {
   try {
-    const res = await fetch("/api/health?detail=1", { headers: { "x-olis-admin": token, Accept: "application/json" }, signal });
-    if (res.status === 401) return { error: "Wrong admin token." };
-    if (res.status === 404) return { error: "Internal health is disabled on the server (OLIS_ADMIN_TOKEN not set)." };
+    const res = await fetch(`/api/health?detail=1${opts.probe ? "&probe=1" : ""}`, { headers: { "x-olis-admin": token, Accept: "application/json" }, signal: opts.signal });
+    if (res.status === 404 || res.status === 401) return { error: "Wrong token, or the admin view isn't enabled on the server." };
     if (!res.ok) return { error: `Server error (${res.status}).` };
     return (await res.json()) as ProviderHealth;
   } catch {

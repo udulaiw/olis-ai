@@ -70,7 +70,9 @@ export type StreamChunk =
   | { type: "text"; delta: string }
   | { type: "tool_call"; call: ToolCall }
   | { type: "native"; data: unknown }
-  | { type: "usage"; usage: Usage };
+  | { type: "usage"; usage: Usage }
+  /** The model is still working (e.g. streaming hidden reasoning). Resets timeouts; never shown. */
+  | { type: "keepalive" };
 
 /** Everything a provider needs to make one call. */
 export interface CallContext {

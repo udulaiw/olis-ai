@@ -30,7 +30,7 @@ export const APPS: OrbixApp[] = [
   { id: "notes", name: "Notes", icon: "feather", connectable: true, pos: { x: 50, y: 11 },
     role: "Let OLIS use your own notes when explaining concepts.",
     access: "Notes you choose to share, by subject" },
-  { id: "papers", name: "Past Papers", icon: "file", connectable: true, pos: { x: 79, y: 22 },
+  { id: "papers", name: "Papers", icon: "file", connectable: true, pos: { x: 79, y: 22 },
     role: "Let OLIS analyse your practice and past-paper activity.",
     access: "Papers attempted, marks and time taken" },
   { id: "progress", name: "Progress", icon: "target", connectable: true, pos: { x: 86, y: 50 },

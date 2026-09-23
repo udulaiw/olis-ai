@@ -64,7 +64,7 @@ export function HomeView({ navigate }: { navigate: (r: Route, o?: { replace?: bo
 
       <div className="mt-8 animate-rise [animation-delay:120ms]">
         <Composer ref={composer} onSend={onSend} autoFocus variant="hero" />
-        <ContextBar className="mt-5 justify-center" />
+        <ContextBar compact className="mt-5 justify-center" />
       </div>
 
       {/* Try */}

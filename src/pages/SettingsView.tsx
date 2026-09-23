@@ -6,7 +6,9 @@ import { AIcon, HoverAnimate } from "../components/AnimatedIcon";
 import { Icon, type IconName } from "../components/Icon";
 import { cx } from "../lib/utils";
 import { StudyProfileEditor } from "../components/StudyProfile";
-import { DeveloperPanel } from "../components/DeveloperPanel";
+import { lazy, Suspense } from "react";
+// Admin-only: not downloaded unless unlocked
+const DeveloperPanel = lazy(() => import("../components/DeveloperPanel").then((m) => ({ default: m.DeveloperPanel })));
 import type { Chat, Theme } from "../types";
 
 function Section({ title, desc, children }: { title: string; desc?: string; children: ReactNode }) {
@@ -28,6 +30,8 @@ const THEMES: { id: Theme; label: string; icon: IconName }[] = [
 export function SettingsView() {
   const { settings, updateSettings, cloud, chats, deleteAllChats, importChats, toast } = useStore();
   const [confirm, setConfirm] = useState<null | "chats" | "reset">(null);
+  const [versionTaps, setVersionTaps] = useState(0);
+  const [devMode, setDevMode] = useState(false);
   const importRef = useRef<HTMLInputElement>(null);
 
   const exportChats = () => {
@@ -126,37 +130,23 @@ export function SettingsView() {
                 <Icon name="refresh" size={13} /> Recheck
               </button>
             </div>
-            {cloud.status === "ready" && cloud.health ? (
-              <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-muted">
-                <dt className="text-faint">AI engines</dt>
-                <dd>
-                  {cloud.health.engines?.busy
-                    ? "Busy right now (free beta limits). Try again in a minute."
-                    : `${cloud.health.engines?.engines ?? 1} ready · OLIS switches automatically if one is busy`}
-                </dd>
-                <dt className="text-faint">Knowledge base</dt>
-                <dd>
-                  {cloud.health.knowledge.files} documents · {cloud.health.knowledge.chunks} passages ·{" "}
-                  {cloud.health.knowledge.semantic ? "semantic + keyword search" : "keyword search"}
-                  {cloud.health.knowledge.pastPaperChunks ? ` · ${cloud.health.knowledge.pastPaperChunks} past-paper passages` : ""}
-                </dd>
-                <dt className="text-faint">Research</dt>
-                <dd>
-                  Wikipedia
-                  {cloud.health.tools.webSearch ? ` · web search (${cloud.health.tools.webSearch === "trusted" ? "trusted sites only" : "open web"})` : ""} · page reading
-                </dd>
-              </dl>
-            ) : cloud.status === "unavailable" ? (
-              <p className="mt-2 leading-relaxed text-muted">
-                {cloud.health && !cloud.health.ok
-                  ? "The server is running but no AI provider key (e.g. GEMINI_API_KEY) is set in Vercel's Environment Variables yet."
-                  : "The OLIS backend isn't running here (e.g. plain static hosting or offline). OLIS is using the offline engine."}
-              </p>
-            ) : null}
+            <p className="mt-2 leading-relaxed text-muted">
+              {cloud.status === "ready"
+                ? cloud.health?.busy
+                  ? "Busy right now (free beta limits). Try again in a minute."
+                  : "Answers use OLIS study notes, Wikipedia and trusted sites, with sources. If one AI engine is busy, OLIS switches automatically."
+                : cloud.status === "unavailable"
+                  ? "OLIS Cloud isn't available right now, so OLIS is using its offline engine."
+                  : "Checking…"}
+            </p>
           </div>
-          <div className="mt-3">
-            <DeveloperPanel />
-          </div>
+          {devMode && (
+            <div className="mt-3">
+              <Suspense fallback={null}>
+                <DeveloperPanel />
+              </Suspense>
+            </div>
+          )}
         </Section>
 
         <Section title="Your data" desc={`${chats.length} chat${chats.length === 1 ? "" : "s"} saved in this browser.`}>
@@ -180,7 +170,21 @@ export function SettingsView() {
         <Section title="About">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <OlisLockup size="md" />
-            <code className="font-mono text-xs text-faint">v0.3 · beta</code>
+            <button
+              type="button"
+              className="font-mono text-xs text-faint"
+              onClick={() => {
+                // Tap 5× to show the admin-only developer panel (hidden from students)
+                const n = versionTaps + 1;
+                setVersionTaps(n);
+                if (n >= 5 && !devMode) {
+                  setDevMode(true);
+                  toast("Developer panel unlocked", "success");
+                }
+              }}
+            >
+              v0.3 · beta
+            </button>
           </div>
           <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface-2 px-4 py-3">
             <div className="text-[13px]">

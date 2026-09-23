@@ -135,7 +135,7 @@ function SelectChip<T extends string>({
   );
 }
 
-const LANGUAGE_LABELS = Object.fromEntries(LANGUAGES.map((l) => [l.id, l.id === "auto" ? "Auto language" : l.label])) as Record<Language, string>;
+const LANGUAGE_LABELS = Object.fromEntries(LANGUAGES.map((l) => [l.id, l.label])) as Record<Language, string>;
 
 export function ContextBar({ className, compact, scroll }: { className?: string; compact?: boolean; scroll?: boolean }) {
   const { settings, setContext, setProfile } = useStore();

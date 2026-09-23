@@ -1,13 +1,16 @@
 // GET /api/health
-//   Public:   what OLIS Cloud can do right now. No provider or model names, no secrets.
-//   Internal: ?detail=1 with header "x-olis-admin: <OLIS_ADMIN_TOKEN>" adds provider/model health.
+//   Public:   { ok, busy } only. Nothing about providers, models, config or the knowledge base.
+//   Internal: ?detail=1 (+ &probe=1) with header "x-olis-admin: <OLIS_ADMIN_TOKEN>".
+//             A missing/wrong token gets the same 404 as a disabled endpoint, so it
+//             doesn't reveal that the internal view exists.
 import { timingSafeEqual } from "node:crypto";
 import { config } from "../server/config.js";
 import { json, errorJson } from "../server/http.js";
 import { indexStats } from "../server/rag.js";
 import { providerHealth, publicEngineSummary } from "../server/ai/status.js";
+import { probeAll } from "../server/ai/probe.js";
 
-const VERSION = "0.3.0-beta";
+const VERSION = "0.3.1-beta";
 
 function tokenOk(given: string | null, expected: string) {
   if (!expected || !given) return false;
@@ -19,28 +22,19 @@ function tokenOk(given: string | null, expected: string) {
 export async function GET(request: Request): Promise<Response> {
   const cfg = config();
   const url = new URL(request.url);
-  const engines = publicEngineSummary();
-  const knowledge = indexStats();
 
   if (url.searchParams.get("detail") === "1") {
-    if (!cfg.adminToken) return errorJson(404, "not_found", "Internal health is disabled (set OLIS_ADMIN_TOKEN to enable it).");
-    if (!tokenOk(request.headers.get("x-olis-admin"), cfg.adminToken)) return errorJson(401, "unauthorized", "Admin token required.");
-    return json({ version: VERSION, ...providerHealth(), knowledge });
+    if (!tokenOk(request.headers.get("x-olis-admin"), cfg.adminToken)) return errorJson(404, "not_found", "Not found.");
+    const probe = url.searchParams.get("probe") === "1" ? await probeAll() : undefined;
+    return json({
+      version: VERSION,
+      ...providerHealth(),
+      probe,
+      knowledge: indexStats(),
+      tools: { webSearch: cfg.tavilyKey ? cfg.webScope : false, feedback: cfg.feedbackWebhook ? "webhook" : "logs" },
+    });
   }
 
-  return json({
-    ok: engines.engines > 0 || engines.busy,
-    version: VERSION,
-    engines,
-    knowledge,
-    tools: {
-      knowledgeBase: true,
-      pastPapers: knowledge.pastPaperChunks > 0,
-      wikipedia: true,
-      webSearch: cfg.tavilyKey ? cfg.webScope : false,
-      readPages: true,
-      images: engines.engines > 0,
-    },
-    feedbackStorage: cfg.feedbackWebhook ? "webhook" : "logs",
-  });
+  const engines = publicEngineSummary();
+  return json({ ok: engines.engines > 0 || engines.busy, busy: engines.busy });
 }

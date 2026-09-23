@@ -295,15 +295,16 @@ await test("10. unauthorized requests are refused", async () => {
   const evil = await agentPOST(apiRequest("/api/agent", agentBody("hi"), { origin: "https://evil.example" }));
   assert(evil.status === 403, `bad-origin status=${evil.status}`);
   const detail = await healthGET(new Request("http://olis.test/api/health?detail=1"));
-  assert(detail.status === 401, `health detail without token=${detail.status}`);
+  assert(detail.status === 404, `health detail without token=${detail.status}`);
   const wrong = await healthGET(new Request("http://olis.test/api/health?detail=1", { headers: { "x-olis-admin": "nope" } }));
-  assert(wrong.status === 401, `wrong token=${wrong.status}`);
+  assert(wrong.status === 404, `wrong token=${wrong.status}`);
   const ok = await healthGET(new Request("http://olis.test/api/health?detail=1", { headers: { "x-olis-admin": "admin-secret" } }));
   const body = await ok.text();
   assert(ok.status === 200 && body.includes("gemini-3.5-flash-lite"), "admin health missing");
   assert(!body.includes("AIza") && !body.includes("nvapi-"), "admin health leaks a key");
   const pub = await (await healthGET(new Request("http://olis.test/api/health"))).text();
   assert(!pub.includes("gemini") && !pub.includes("nvidia"), "public health exposes provider names");
+  assert(JSON.stringify(Object.keys(JSON.parse(pub)).sort()) === '["busy","ok"]', `public health exposes extra fields: ${pub}`);
   assert(calls.length === 0, "a model was called for a refused request");
 });
 

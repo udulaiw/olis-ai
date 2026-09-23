@@ -213,6 +213,7 @@ export async function* streamWithFallback(o: StreamOptions): AsyncGenerator<Rout
             usage = chunk.usage;
             continue;
           }
+          if (chunk.type === "keepalive") continue;
           wroteThisAttempt = true; // text, tool calls or native data the caller must discard on failure
           yield chunk;
         }

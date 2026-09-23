@@ -13,7 +13,7 @@ export async function POST(request: Request): Promise<Response> {
   const b = (g.body ?? {}) as Record<string, unknown>;
   const kind = b.kind === "flashcards" ? "flashcards" : b.kind === "quiz" ? "quiz" : null;
   if (!kind) return errorJson(400, "bad_request", "kind must be 'quiz' or 'flashcards'.");
-  if (!anyEngineConfigured("structured")) return errorJson(503, "config", "OLIS Cloud isn't configured yet: no AI provider key is set on the server.");
+  if (!anyEngineConfigured("structured")) return errorJson(503, "config", "OLIS Cloud isn't available right now.");
   try {
     const out = await generate(
       cfg,
