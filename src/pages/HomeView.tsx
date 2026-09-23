@@ -132,6 +132,25 @@ export function HomeView({ navigate }: { navigate: (r: Route, o?: { replace?: bo
         </div>
       </div>
 
+      {/* ORBIX preview teaser */}
+      <HoverAnimate>
+        <button
+          onClick={() => navigate({ name: "orbix" })}
+          className="group mt-10 flex w-full items-center gap-4 rounded-2xl border border-line bg-surface/50 px-4 py-4 text-left transition hover:border-line-strong hover:bg-surface animate-rise [animation-delay:280ms]"
+        >
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent">
+            <AIcon name="orbit" size={19} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="flex items-center gap-2 text-sm font-medium">
+              OLIS × ORBIX <span className="badge-beta !bg-transparent !text-faint ring-1 ring-line">DEMO</span>
+            </span>
+            <span className="block text-xs text-faint">See how OLIS will work inside orbix.lk</span>
+          </span>
+          <AIcon name="arrowRight" size={16} className="shrink-0 text-faint transition-colors group-hover:text-accent" />
+        </button>
+      </HoverAnimate>
+
       {!settings.noticeDismissed && (
         <BetaNotice className="mt-10 animate-rise [animation-delay:300ms]" onDismiss={() => updateSettings({ noticeDismissed: true })} />
       )}

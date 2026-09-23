@@ -18,6 +18,7 @@ const NAV: { label: string; icon: AnimatedIconName; to: Route; match: (r: Route)
   { label: "New Chat", icon: "chat", to: { name: "chat", id: null }, match: (r) => r.name === "chat" && r.id === null },
   { label: "History", icon: "history", to: { name: "history" }, match: (r) => r.name === "history" },
   { label: "Study Tools", icon: "layers", to: { name: "tools", tool: "flashcards" }, match: (r) => r.name === "tools" },
+  { label: "OLIS × ORBIX", icon: "orbit", to: { name: "orbix" }, match: (r) => r.name === "orbix" },
   { label: "Settings", icon: "settings", to: { name: "settings" }, match: (r) => r.name === "settings" },
 ];
 

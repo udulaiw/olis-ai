@@ -13,6 +13,7 @@ import { Orb } from "./components/Orb";
 // Secondary pages load on demand so the first paint (home/chat) stays light.
 const HistoryView = lazy(() => import("./pages/HistoryView").then((m) => ({ default: m.HistoryView })));
 const ToolsView = lazy(() => import("./pages/ToolsView").then((m) => ({ default: m.ToolsView })));
+const OrbixView = lazy(() => import("./pages/OrbixView").then((m) => ({ default: m.OrbixView })));
 const SettingsView = lazy(() => import("./pages/SettingsView").then((m) => ({ default: m.SettingsView })));
 
 const PageFallback = () => (
@@ -26,7 +27,7 @@ function Shell() {
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
-    const titles: Record<string, string> = { home: "OLIS AI · Beta", chat: "Chat · OLIS", history: "History · OLIS", tools: "Study Tools · OLIS", settings: "Settings · OLIS" };
+    const titles: Record<string, string> = { home: "OLIS AI · Beta", chat: "Chat · OLIS", history: "History · OLIS", tools: "Study Tools · OLIS", settings: "Settings · OLIS", orbix: "OLIS × ORBIX" };
     document.title = titles[route.name];
   }, [route.name]);
 
@@ -59,6 +60,7 @@ function Shell() {
             {route.name === "history" && <HistoryView navigate={navigate} />}
             {route.name === "tools" && <ToolsView tool={route.tool} navigate={navigate} />}
             {route.name === "settings" && <SettingsView />}
+            {route.name === "orbix" && <OrbixView navigate={navigate} />}
           </Suspense>
         </main>
 

@@ -5,7 +5,8 @@ export type Route =
   | { name: "chat"; id: string | null }
   | { name: "history" }
   | { name: "tools"; tool: ToolId }
-  | { name: "settings" };
+  | { name: "settings" }
+  | { name: "orbix" };
 
 export type ToolId = "flashcards" | "quiz" | "planner" | "explainer";
 const TOOLS: ToolId[] = ["flashcards", "quiz", "planner", "explainer"];
@@ -21,6 +22,8 @@ export function parse(hash: string): Route {
       return { name: "tools", tool: TOOLS.includes(b as ToolId) ? (b as ToolId) : "flashcards" };
     case "settings":
       return { name: "settings" };
+    case "orbix":
+      return { name: "orbix" };
     default:
       return { name: "home" };
   }

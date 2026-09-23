@@ -426,6 +426,40 @@ select.field {
   to   { transform: rotate(90deg) scale(1); } /* 4-point star: 90° looks identical, so no jump */
 }
 
+/* ── OLIS × ORBIX map ─────────────────────────────────────────────────── */
+.orbix-line { stroke: var(--c-border-strong); stroke-width: 1; fill: none; }
+.orbix-line-on { stroke: color-mix(in srgb, var(--c-accent) 45%, transparent); stroke-width: 1.25; fill: none; }
+/* A small glowing dot that travels from a connected app into OLIS */
+.orbix-dot {
+  position: absolute; left: var(--x0); top: var(--y0);
+  width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 99px;
+  background: var(--c-accent);
+  box-shadow: 0 0 0 3px var(--c-accent-soft), 0 0 12px var(--c-accent);
+  opacity: 0; pointer-events: none;
+  animation: orbix-flow 2.8s cubic-bezier(0.45, 0, 0.55, 1) infinite both;
+}
+@keyframes orbix-flow {
+  0%   { left: var(--x0); top: var(--y0); opacity: 0; }
+  20%  { opacity: 1; }
+  80%  { opacity: 1; }
+  100% { left: 50%; top: 50%; opacity: 0; }
+}
+.orbix-core {
+  padding: 10px;
+  background: var(--c-bg);
+  transition: box-shadow 0.6s ease;
+}
+.orbix-core.is-on { animation: orbix-halo 3.2s ease-in-out infinite; }
+@keyframes orbix-halo {
+  0%, 100% { box-shadow: 0 0 0 0 transparent; }
+  50%      { box-shadow: 0 0 0 10px var(--c-accent-soft); }
+}
+/* Dotted canvas behind the Workspace preview cards */
+.orbix-board {
+  background-image: radial-gradient(var(--c-border-strong) 1px, transparent 1px);
+  background-size: 18px 18px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
 }
