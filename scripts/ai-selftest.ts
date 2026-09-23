@@ -248,13 +248,13 @@ await test("7c. invalid request (400) → never resent to that provider", async 
   for (const m of ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.1-flash-lite"]) behaviours[m] = [{ kind: "status", status: 400, body: { error: { message: "Invalid JSON payload" } } }];
   const { text } = await collect(streamWithFallback({ task: "general", required: ["text"], req: req("hi") }));
   assert(calls.filter((c) => c.model.startsWith("gemini")).length === 1, `gemini calls=${calls.filter((c) => c.model.startsWith("gemini")).length}`);
-  assert(text === "answer from openai/gpt-oss-20b", `text=${text}`);
+  assert(text === "answer from nvidia/nemotron-3-super-120b-a12b", `text=${text}`);
 });
 
 await test("7d. invalid key (auth) → skip provider, use NVIDIA", async () => {
   behaviours["gemini-3.5-flash-lite"] = [{ kind: "status", status: 400, body: { error: { message: "API key not valid. Please pass a valid API key." } } }];
   const { text } = await collect(streamWithFallback({ task: "general", required: ["text"], req: req("hi") }));
-  assert(text === "answer from openai/gpt-oss-20b", `text=${text}`);
+  assert(text === "answer from nvidia/nemotron-3-super-120b-a12b", `text=${text}`);
   const { skipped } = candidates("general", ["text"]);
   assert(skipped.filter((s) => s.key.startsWith("gemini")).length === 3, "gemini not cooled down after auth error");
 });
@@ -365,7 +365,7 @@ await test("15. quiz JSON: unusable output → next model", async () => {
 
 await test("16. NVIDIA reasoning output hides <think> blocks", async () => {
   for (const m of ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.1-flash-lite"]) behaviours[m] = [{ kind: "status", status: 503 }];
-  behaviours["openai/gpt-oss-20b"] = [{ kind: "text", text: "<think>secret reasoning</think>Final answer." }];
+  behaviours["nvidia/nemotron-3-super-120b-a12b"] = [{ kind: "text", text: "<think>secret reasoning</think>Final answer." }];
   const { text } = await collect(streamWithFallback({ task: "general", required: ["text"], req: req("hi") }));
   assert(text === "Final answer.", `text=${JSON.stringify(text)}`);
 });
