@@ -245,7 +245,7 @@ await test("7b. failure mid-answer → rewind + clean answer from fallback", asy
 });
 
 await test("7c. invalid request (400) → never resent to that provider", async () => {
-  for (const m of ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-2.5-flash"]) behaviours[m] = [{ kind: "status", status: 400, body: { error: { message: "Invalid JSON payload" } } }];
+  for (const m of ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.1-flash-lite"]) behaviours[m] = [{ kind: "status", status: 400, body: { error: { message: "Invalid JSON payload" } } }];
   const { text } = await collect(streamWithFallback({ task: "general", required: ["text"], req: req("hi") }));
   assert(calls.filter((c) => c.model.startsWith("gemini")).length === 1, `gemini calls=${calls.filter((c) => c.model.startsWith("gemini")).length}`);
   assert(text === "answer from openai/gpt-oss-20b", `text=${text}`);
@@ -364,7 +364,7 @@ await test("15. quiz JSON: unusable output → next model", async () => {
 });
 
 await test("16. NVIDIA reasoning output hides <think> blocks", async () => {
-  for (const m of ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-2.5-flash"]) behaviours[m] = [{ kind: "status", status: 503 }];
+  for (const m of ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.1-flash-lite"]) behaviours[m] = [{ kind: "status", status: 503 }];
   behaviours["openai/gpt-oss-20b"] = [{ kind: "text", text: "<think>secret reasoning</think>Final answer." }];
   const { text } = await collect(streamWithFallback({ task: "general", required: ["text"], req: req("hi") }));
   assert(text === "Final answer.", `text=${JSON.stringify(text)}`);

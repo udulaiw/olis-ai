@@ -64,12 +64,12 @@ export function catalog(): ModelSpec[] {
     {
       key: "gemini-backup",
       provider: "gemini",
-      model: env("GEMINI_BACKUP_MODEL") || "gemini-2.5-flash",
+      model: env("GEMINI_BACKUP_MODEL") || "gemini-3.1-flash-lite",
       tier: "free",
       capabilities: ["text", "tools", "vision", "json", "long_context", "reasoning", "multilingual"],
       contextTokens: 1_000_000,
       dailyBudget: 200,
-      notes: "Older generation with its own separate quota. Used when the others are rate-limited.",
+      notes: "Separate free quota. Used when the others are busy or rate-limited.",
     },
 
     // NVIDIA API catalog (optional). OpenAI-compatible. Free endpoints are for
