@@ -1,0 +1,36 @@
+{
+  "name": "olis-ai-beta",
+  "version": "0.2.0",
+  "private": true,
+  "description": "OLIS AI Beta — Orbix Learning Intelligence System. A free-to-run AI learning workspace prototype.",
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/build-index.mjs && vite",
+    "build": "tsc --noEmit && vite build",
+    "vercel-build": "node scripts/build-index.mjs && npm run build",
+    "index": "node scripts/build-index.mjs",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "katex": "^0.18.7",
+    "marked": "^18.0.14",
+    "motion": "^13.4.1",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "thinking-orbs": "^0.3.2"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/node": "^26.6.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
