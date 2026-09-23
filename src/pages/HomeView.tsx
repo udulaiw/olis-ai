@@ -44,7 +44,7 @@ export function HomeView({ navigate }: { navigate: (r: Route, o?: { replace?: bo
       {/* Identity */}
       <div className="mb-12 flex items-center justify-between gap-4 animate-rise">
         <div>
-          <OlisLockup size="md" />
+          <OlisLockup size="md" alive="full" />
           <p className="mt-4 text-sm text-muted">
             <span className="font-medium text-ink">OLIS AI</span> · Your intelligent learning workspace.
           </p>

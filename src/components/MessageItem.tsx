@@ -1,4 +1,4 @@
-import { memo, useState } from "react";
+import { memo, useRef, useState } from "react";
 import type { Message } from "../types";
 import { MODE_META } from "../services/intent";
 import { useStore } from "../store/AppStore";
@@ -20,6 +20,10 @@ interface Props {
 export const MessageItem = memo(function MessageItem({ chatId, msg, isLastAssistant, busy }: Props) {
   const { regenerate, updateQuiz, toast, engine, rate, send } = useStore();
   const [copied, setCopied] = useState(false);
+  // Did we watch this answer being written? Then the logo "arrives" when it finishes
+  // (but not for old answers loaded from history).
+  const sawWorking = useRef(false);
+  if (msg.status === "thinking" || msg.status === "streaming") sawWorking.current = true;
 
   if (msg.role === "user") {
     return (
@@ -62,7 +66,7 @@ export const MessageItem = memo(function MessageItem({ chatId, msg, isLastAssist
   return (
     <div className="group flex gap-3 animate-rise sm:gap-4" data-msg={msg.id}>
       <div className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center">
-        {working ? <Orb state={orb} size={32} label={runningStep?.label ?? thinkingLabel} /> : <OlisMark size={30} />}
+        {working ? <Orb state={orb} size={32} label={runningStep?.label ?? thinkingLabel} /> : <OlisMark size={30} alive={isLastAssistant ? "full" : "calm"} arrive={sawWorking.current} />}
       </div>
       <div className="min-w-0 flex-1">
         <div className="mb-1 flex items-center gap-2 text-[13px]">
