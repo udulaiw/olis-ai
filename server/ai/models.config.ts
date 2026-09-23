@@ -131,15 +131,17 @@ export function catalog(): ModelSpec[] {
 // configured, that lack a required capability, are cooling down after a
 // rate limit, or are blocked by Free Beta are skipped automatically.
 export const ROUTES: Record<Task, string[]> = {
-  general: ["gemini-fast", "gemini-reasoning", "gemini-backup", "nvidia-fast", "nvidia-reasoning", "nvidia-nemotron", "local"],
-  reasoning: ["gemini-reasoning", "gemini-backup", "nvidia-reasoning", "nvidia-nemotron", "gemini-fast", "local"],
-  mathematics: ["gemini-reasoning", "gemini-backup", "nvidia-reasoning", "nvidia-nemotron", "gemini-fast", "local"],
-  physics: ["gemini-reasoning", "gemini-backup", "nvidia-reasoning", "nvidia-nemotron", "gemini-fast", "local"],
-  chemistry: ["gemini-reasoning", "gemini-fast", "gemini-backup", "nvidia-reasoning", "nvidia-nemotron", "local"],
+  // NVIDIA order reflects live tests (Sep 2026): Nemotron answers in <1 s on the
+  // free tier; DeepSeek / gpt-oss often queue for 25 s+, so they come last.
+  general: ["gemini-fast", "gemini-reasoning", "gemini-backup", "nvidia-nemotron", "nvidia-fast", "nvidia-reasoning", "local"],
+  reasoning: ["gemini-reasoning", "gemini-backup", "nvidia-nemotron", "gemini-fast", "nvidia-reasoning", "local"],
+  mathematics: ["gemini-reasoning", "gemini-backup", "nvidia-nemotron", "gemini-fast", "nvidia-reasoning", "local"],
+  physics: ["gemini-reasoning", "gemini-backup", "nvidia-nemotron", "gemini-fast", "nvidia-reasoning", "local"],
+  chemistry: ["gemini-reasoning", "gemini-fast", "gemini-backup", "nvidia-nemotron", "nvidia-reasoning", "local"],
   vision: ["gemini-reasoning", "gemini-fast", "gemini-backup", "nvidia-vision"],
-  sinhala: ["gemini-reasoning", "gemini-fast", "gemini-backup", "nvidia-reasoning", "nvidia-nemotron"],
-  long_context: ["gemini-fast", "gemini-reasoning", "gemini-backup", "nvidia-reasoning", "nvidia-nemotron"],
-  structured: ["gemini-fast", "gemini-reasoning", "gemini-backup", "nvidia-fast", "nvidia-reasoning", "local"],
+  sinhala: ["gemini-reasoning", "gemini-fast", "gemini-backup", "nvidia-nemotron", "nvidia-reasoning"],
+  long_context: ["gemini-fast", "gemini-reasoning", "gemini-backup", "nvidia-nemotron", "nvidia-reasoning"],
+  structured: ["gemini-fast", "gemini-reasoning", "gemini-backup", "nvidia-nemotron", "nvidia-fast", "local"],
 };
 
 // ── Free Beta ──────────────────────────────────
