@@ -127,6 +127,19 @@ A 3-failures-in-a-row circuit breaker also cools a model down for 30 s.
 - **Body limits:** 120 kB text requests, ~3 MB with photos (max 2 per message, JPEG/PNG/WebP, downsized in the browser).
 - **What OLIS does NOT do:** create extra accounts, rotate keys or identities, or otherwise work around a provider's limits. One key per provider. The goal is reliable orchestration, not quota abuse.
 
+## O/L + A/L, Sinhala and evaluation
+
+OLIS serves both G.C.E. O/L and A/L students. The language layer (`server/lang/`), level-aware retrieval,
+grounding rules, PDF ingest and the evaluation suite are described in **`docs/ol-al-upgrade.md`**.
+
+```
+npm test            # existing agent tests + language/Unicode tests + offline retrieval eval
+npm run test:lang   # Sinhala Unicode, language detection, Singlish expansion, maths tool
+npm run eval        # retrieval / no-source / level-isolation metrics with regression floors
+npm run eval:live   # against a running OLIS with real model keys (not part of npm test)
+npm run ingest -- <folder|pdf|zip> --level ol --subject "Science"
+```
+
 ## Sri Lankan A/L knowledge
 
 - `server/knowledge/taxonomy.ts`: a **provisional** topic map for Combined Maths, Physics and Chemistry, used for routing, tagging and "what topic is this testing?". Units are marked `verified: false` until checked against the NIE syllabus.

@@ -1,6 +1,6 @@
 # Past papers
 
-Real Sri Lankan G.C.E. A/L past-paper questions and marking schemes, one
+Real Sri Lankan G.C.E. O/L and A/L past-paper questions and marking schemes, one
 question per file. OLIS searches these with the `search_past_papers` tool and
 **only** quotes what is here. It never invents past-paper questions.
 
@@ -27,6 +27,8 @@ rename it. Frontmatter fields:
 |---|---|---|---|
 | `type` | ✅ | `past_paper` | Keeps it separate from notes |
 | `subject` | ✅ | `Physics` | Filtering, subject boost |
+| `level` | ✅ | `OL` / `AL` | O/L papers are never shown to A/L students and vice versa |
+| `exam` | optional | `G.C.E. O/L 2022` | Citation |
 | `year` | ✅ | `2023` | "Show me 2023 questions" |
 | `paper` | ✅ | `Paper II (Structured)` | Labels, citations |
 | `question` | ✅ | `5` | Citations ("2023 · Paper II · Q5") |

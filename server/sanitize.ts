@@ -4,7 +4,10 @@
 import type { LearningContext, StudentProfile } from "./prompts.js";
 import type { ImageInput } from "./ai/types.js";
 
-export const str = (v: unknown, max: number, d = "") => (typeof v === "string" ? v.slice(0, max) : d);
+import { cleanSinhala } from "./lang/unicode.mjs";
+
+/** Client text: clipped, and put in NFC so Sinhala typed on any keyboard/IME compares equal (never NFKD: it splits ො/ෝ/ෞ). */
+export const str = (v: unknown, max: number, d = "") => (typeof v === "string" ? cleanSinhala(v.slice(0, max)) : d);
 
 /** Short free text from the profile: one line, no markup/tag characters. */
 const line = (v: unknown, max: number) =>
@@ -31,6 +34,7 @@ export function parseProfile(v: unknown): StudentProfile | undefined {
     currentTopic: line(p.currentTopic, 80) || undefined,
     weakTopics: list(p.weakTopics, 8, 60),
     goals: line(p.goals, 200) || undefined,
+    examLevel: p.examLevel === "OL" || p.examLevel === "AL" ? p.examLevel : undefined,
   };
   return Object.values(profile).some((x) => (Array.isArray(x) ? x.length : x)) ? profile : undefined;
 }

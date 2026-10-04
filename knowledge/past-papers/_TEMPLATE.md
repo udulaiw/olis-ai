@@ -1,7 +1,9 @@
 ---
 title: <Subject> <Year> Paper <N> Question <M>
 type: past_paper
-subject: <Combined Mathematics | Physics | Chemistry>
+subject: <Combined Mathematics | Physics | Chemistry | Science | Mathematics …>
+level: <OL | AL>
+exam: <e.g. G.C.E. O/L 2022 | G.C.E. A/L 2023>
 year: <YYYY>
 paper: <Paper I (MCQ) | Paper II (Structured) | Paper II (Essay)>
 question: <M>

@@ -1,0 +1,734 @@
+{
+  "_about": "Offline evaluation set for OLIS. `language`, `followups`, `levels` and `unicode` are deterministic unit checks. `retrieval` and `no_source` run against the real knowledge index in keyword mode (no API key). `live` is for scripts/eval-live.mjs and needs a running OLIS with model keys.",
+  "floors": {
+    "hit3": 95,
+    "hit3_si": 90,
+    "hit3_singlish": 90,
+    "hit3_typo": 90,
+    "noSource": 100,
+    "covered": 90,
+    "levelIsolation": 100,
+    "detection": 100,
+    "reply": 100
+  },
+  "_floors_note": "Regression floors for `npm run eval`: set a little below the measured baseline. Raise them when you improve retrieval; never lower one to make a failing change pass without saying why.",
+  "language": [
+    {
+      "q": "What is speed in physics?",
+      "detected": "en",
+      "reply": "en"
+    },
+    {
+      "q": "Explain Newton's second law",
+      "detected": "en",
+      "reply": "en"
+    },
+    {
+      "q": "I'm going to study integration tomorrow",
+      "detected": "en",
+      "reply": "en"
+    },
+    {
+      "q": "Mata Hari was a spy",
+      "detected": "en",
+      "reply": "en"
+    },
+    {
+      "q": "What is the API of Vercel?",
+      "detected": "en",
+      "reply": "en"
+    },
+    {
+      "q": "භෞතික විද්‍යාවේ වේගය කියන්නේ මොකක්ද?",
+      "detected": "si",
+      "reply": "si"
+    },
+    {
+      "q": "වේගය හොයන්නේ කොහොමද",
+      "detected": "si",
+      "reply": "si"
+    },
+    {
+      "q": "සිංහලෙන් කියන්න",
+      "detected": "si",
+      "reply": "si"
+    },
+    {
+      "q": "physics wala speed kiyanne mokakda?",
+      "detected": "singlish",
+      "reply": "si_mixed"
+    },
+    {
+      "q": "Newton 2nd law eka explain karanna",
+      "detected": "singlish",
+      "reply": "si_mixed"
+    },
+    {
+      "q": "speed eka calculate krnne kohomada",
+      "detected": "singlish",
+      "reply": "si_mixed"
+    },
+    {
+      "q": "meka explain krnna",
+      "detected": "singlish",
+      "reply": "si_mixed"
+    },
+    {
+      "q": "maths wala meka kohomada",
+      "detected": "singlish",
+      "reply": "si_mixed"
+    },
+    {
+      "q": "science paper eke 12 answer eka mokakda",
+      "detected": "singlish",
+      "reply": "si_mixed"
+    },
+    {
+      "q": "meka sinhalen kiyanna",
+      "detected": "singlish",
+      "reply": "si_mixed"
+    },
+    {
+      "q": "මේක explain කරන්න",
+      "detected": "mixed",
+      "reply": "si_mixed"
+    },
+    {
+      "q": "Newton's second law එක සිංහලෙන් explain කරන්න.",
+      "detected": "mixed",
+      "reply": "si_mixed"
+    },
+    {
+      "q": "Explain this in English",
+      "detected": "en",
+      "reply": "en"
+    },
+    {
+      "q": "answer in English please: වේගය කියන්නේ මොකක්ද",
+      "detected": "mixed",
+      "reply": "en"
+    },
+    {
+      "q": "வேகம் என்றால் என்ன",
+      "detected": "ta",
+      "reply": "ta"
+    },
+    {
+      "q": "වේගය කියන්නේ මොකක්ද",
+      "pref": "en",
+      "detected": "si",
+      "reply": "en",
+      "note": "saved preference English"
+    },
+    {
+      "q": "What is speed?",
+      "pref": "si",
+      "detected": "en",
+      "reply": "si",
+      "note": "saved preference Sinhala"
+    },
+    {
+      "q": "සිංහලෙන් කියන්න",
+      "pref": "en",
+      "detected": "si",
+      "reply": "si",
+      "note": "explicit request beats the saved preference"
+    },
+    {
+      "q": "ok",
+      "history": [
+        {
+          "role": "user",
+          "content": "වේගය කියන්නේ මොකක්ද"
+        }
+      ],
+      "detected": "en",
+      "reply": "si",
+      "note": "short message keeps the conversation language"
+    }
+  ],
+  "followups": [
+    {
+      "q": "මේක තේරෙන්නෙ නෑ",
+      "kind": "not_understood"
+    },
+    {
+      "q": "මේක තේරුණේ නෑ",
+      "kind": "not_understood"
+    },
+    {
+      "q": "meka therenne naha",
+      "kind": "not_understood"
+    },
+    {
+      "q": "I don't understand this",
+      "kind": "not_understood"
+    },
+    {
+      "q": "සිංහලෙන් explain කරන්න",
+      "kind": "language_switch"
+    },
+    {
+      "q": "in English please",
+      "kind": "language_switch"
+    },
+    {
+      "q": "explain more",
+      "kind": "more"
+    },
+    {
+      "q": "simpler please",
+      "kind": "simpler"
+    },
+    {
+      "q": "මේක",
+      "kind": "anaphora"
+    },
+    {
+      "q": "What is a vector?",
+      "kind": null
+    },
+    {
+      "q": "ok thanks",
+      "kind": null
+    }
+  ],
+  "levels": [
+    {
+      "q": "O/L science question about heat",
+      "level": "OL"
+    },
+    {
+      "q": "grade 11 maths help",
+      "level": "OL"
+    },
+    {
+      "q": "සාමාන්‍ය පෙළ ගණිතය",
+      "level": "OL"
+    },
+    {
+      "q": "A/L physics help",
+      "level": "AL"
+    },
+    {
+      "q": "උසස් පෙළ භෞතිකය",
+      "level": "AL"
+    },
+    {
+      "q": "help",
+      "stream": "Biological Science",
+      "level": "AL"
+    },
+    {
+      "q": "hi",
+      "examLevel": "OL",
+      "level": "OL"
+    },
+    {
+      "q": "Al is my friend",
+      "level": null
+    }
+  ],
+  "unicode": {
+    "must_be_clean": [
+      "ශ්‍රී ලංකාව",
+      "විද්‍යාව",
+      "ගණිතය",
+      "භෞතික විද්‍යාව",
+      "රසායන විද්‍යාව",
+      "මෙය පැහැදිලි කරන්න.",
+      "Newton's second law එක සිංහලෙන් explain කරන්න.",
+      "ක්‍රියාකාරකම් සහ ප්‍රායෝගික ගැටලු",
+      "ඉංග්‍රීසි / English / සිංහල"
+    ],
+    "must_be_flagged": [
+      {
+        "text": "यह गुरुत्वाकर्षण बल है",
+        "expect": "si",
+        "code": "devanagari"
+      },
+      {
+        "text": "ශ්‍රී ලංකාව �",
+        "expect": "si",
+        "code": "replacement_char"
+      },
+      {
+        "text": "ශ්‍රී ලංකාව ??????",
+        "expect": "si",
+        "code": "question_marks"
+      },
+      {
+        "text": "ා මෙය",
+        "expect": "si",
+        "code": "orphan_combining"
+      },
+      {
+        "text": "வேகம்",
+        "expect": "en",
+        "code": "tamil"
+      }
+    ]
+  },
+  "retrieval": [
+    {
+      "q": "What is speed in physics?",
+      "expect": [
+        "knowledge/physics/kinematics.md"
+      ],
+      "tags": [
+        "en",
+        "concept"
+      ]
+    },
+    {
+      "q": "What is Newton's second law?",
+      "expect": [
+        "knowledge/physics/newtons-laws.md"
+      ],
+      "tags": [
+        "en"
+      ]
+    },
+    {
+      "q": "Explain conservation of momentum",
+      "expect": [
+        "knowledge/physics/momentum.md"
+      ],
+      "tags": [
+        "en"
+      ]
+    },
+    {
+      "q": "SUVAT equations for constant acceleration",
+      "expect": [
+        "knowledge/physics/kinematics.md"
+      ],
+      "tags": [
+        "en"
+      ]
+    },
+    {
+      "q": "How do I integrate by parts?",
+      "expect": [
+        "knowledge/combined-mathematics/integration.md"
+      ],
+      "tags": [
+        "en"
+      ]
+    },
+    {
+      "q": "Find the derivative of a product of two functions",
+      "expect": [
+        "knowledge/combined-mathematics/differentiation.md"
+      ],
+      "tags": [
+        "en"
+      ]
+    },
+    {
+      "q": "What is a mole and how do I calculate moles?",
+      "expect": [
+        "knowledge/chemistry/mole-concept.md"
+      ],
+      "tags": [
+        "en",
+        "calculation"
+      ]
+    },
+    {
+      "q": "Describe the light-dependent reactions",
+      "expect": [
+        "knowledge/biology/photosynthesis.md"
+      ],
+      "tags": [
+        "en"
+      ]
+    },
+    {
+      "q": "What is the discriminant of a quadratic equation?",
+      "expect": [
+        "knowledge/combined-mathematics/quadratics.md"
+      ],
+      "tags": [
+        "en"
+      ]
+    },
+    {
+      "q": "Projectile range and time of flight",
+      "expect": [
+        "knowledge/physics/projectile.md"
+      ],
+      "tags": [
+        "en"
+      ]
+    },
+    {
+      "q": "VSEPR shapes of molecules",
+      "expect": [
+        "knowledge/chemistry/bonding.md"
+      ],
+      "tags": [
+        "en"
+      ]
+    },
+    {
+      "q": "How does DNA replicate?",
+      "expect": [
+        "knowledge/biology/dna.md"
+      ],
+      "tags": [
+        "en"
+      ]
+    },
+    {
+      "q": "භෞතික විද්‍යාවේ වේගය කියන්නේ මොකක්ද?",
+      "expect": [
+        "knowledge/physics/kinematics.md"
+      ],
+      "tags": [
+        "si"
+      ]
+    },
+    {
+      "q": "නිව්ටන්ගේ දෙවන නියමය පැහැදිලි කරන්න",
+      "expect": [
+        "knowledge/physics/newtons-laws.md"
+      ],
+      "tags": [
+        "si"
+      ]
+    },
+    {
+      "q": "අනුකලනය කරන්නේ කොහොමද",
+      "expect": [
+        "knowledge/combined-mathematics/integration.md"
+      ],
+      "tags": [
+        "si"
+      ]
+    },
+    {
+      "q": "ප්‍රභාසංශ්ලේෂණය කියන්නේ මොකක්ද",
+      "expect": [
+        "knowledge/biology/photosynthesis.md"
+      ],
+      "tags": [
+        "si"
+      ]
+    },
+    {
+      "q": "ගම්‍යතා සංස්ථිති නියමය",
+      "expect": [
+        "knowledge/physics/momentum.md"
+      ],
+      "tags": [
+        "si"
+      ]
+    },
+    {
+      "q": "මවුලය කියන්නේ මොකක්ද",
+      "expect": [
+        "knowledge/chemistry/mole-concept.md"
+      ],
+      "tags": [
+        "si"
+      ]
+    },
+    {
+      "q": "ශ්වසනය කියන්නේ මොකක්ද",
+      "expect": [
+        "knowledge/biology/respiration.md"
+      ],
+      "tags": [
+        "si"
+      ]
+    },
+    {
+      "q": "විද්‍යුත් ධාරාව සහ ප්‍රතිරෝධය",
+      "expect": [
+        "knowledge/physics/electricity.md"
+      ],
+      "tags": [
+        "si"
+      ]
+    },
+    {
+      "q": "physics wala speed kiyanne mokakda?",
+      "expect": [
+        "knowledge/physics/kinematics.md"
+      ],
+      "tags": [
+        "singlish"
+      ]
+    },
+    {
+      "q": "Newton 2nd law eka explain karanna",
+      "expect": [
+        "knowledge/physics/newtons-laws.md"
+      ],
+      "tags": [
+        "singlish"
+      ]
+    },
+    {
+      "q": "integration by parts eka kohomada karanne",
+      "expect": [
+        "knowledge/combined-mathematics/integration.md"
+      ],
+      "tags": [
+        "singlish"
+      ]
+    },
+    {
+      "q": "mole concept eka kiyanne mokakda",
+      "expect": [
+        "knowledge/chemistry/mole-concept.md"
+      ],
+      "tags": [
+        "singlish"
+      ]
+    },
+    {
+      "q": "projectile motion wala range eka hoyanne kohomada",
+      "expect": [
+        "knowledge/physics/projectile.md"
+      ],
+      "tags": [
+        "singlish"
+      ]
+    },
+    {
+      "q": "dna replication eka pahadili karanna",
+      "expect": [
+        "knowledge/biology/dna.md"
+      ],
+      "tags": [
+        "singlish"
+      ]
+    },
+    {
+      "q": "ohm's law eka kohomada use karanne",
+      "expect": [
+        "knowledge/physics/electricity.md"
+      ],
+      "tags": [
+        "singlish"
+      ]
+    },
+    {
+      "q": "differentiation karanne kohomada",
+      "expect": [
+        "knowledge/combined-mathematics/differentiation.md"
+      ],
+      "tags": [
+        "singlish"
+      ]
+    },
+    {
+      "q": "newtons secnd law explan",
+      "expect": [
+        "knowledge/physics/newtons-laws.md"
+      ],
+      "tags": [
+        "typo"
+      ]
+    },
+    {
+      "q": "difrentiation of a prodcut",
+      "expect": [
+        "knowledge/combined-mathematics/differentiation.md"
+      ],
+      "tags": [
+        "typo"
+      ]
+    },
+    {
+      "q": "photosynthsis lite reactions",
+      "expect": [
+        "knowledge/biology/photosynthesis.md"
+      ],
+      "tags": [
+        "typo"
+      ]
+    },
+    {
+      "q": "quadratic equaton discriminat",
+      "expect": [
+        "knowledge/combined-mathematics/quadratics.md"
+      ],
+      "tags": [
+        "typo"
+      ]
+    },
+    {
+      "q": "Newton's third law says force equals mass times acceleration, right?",
+      "expect": [
+        "knowledge/physics/newtons-laws.md"
+      ],
+      "tags": [
+        "misleading"
+      ],
+      "note": "retrieval must still find the correct source so the model can correct the student"
+    }
+  ],
+  "no_source": [
+    {
+      "q": "What are the marks allocated to question 4 of the 2019 History paper?",
+      "tags": [
+        "past-paper",
+        "en"
+      ]
+    },
+    {
+      "q": "Who won the 2018 FIFA World Cup?",
+      "tags": [
+        "out-of-syllabus",
+        "en"
+      ]
+    },
+    {
+      "q": "Explain the Kandyan Convention of 1815",
+      "tags": [
+        "history",
+        "en"
+      ]
+    },
+    {
+      "q": "ශ්‍රී ලංකාවට ස්වාධීනත්වය ලැබුණේ කවදාද",
+      "tags": [
+        "history",
+        "si"
+      ]
+    },
+    {
+      "q": "history paper eke 12 answer eka mokakda",
+      "tags": [
+        "past-paper",
+        "singlish"
+      ]
+    },
+    {
+      "q": "Write a Python program to sort a list",
+      "tags": [
+        "out-of-syllabus",
+        "en"
+      ]
+    }
+  ],
+  "level_isolation": [
+    {
+      "q": "What is speed?",
+      "level": "OL",
+      "must_include": [
+        "motion-grade10.md"
+      ],
+      "must_exclude": [
+        "motion-al.md"
+      ]
+    },
+    {
+      "q": "What is speed?",
+      "level": "AL",
+      "must_include": [
+        "motion-al.md"
+      ],
+      "must_exclude": [
+        "motion-grade10.md"
+      ]
+    },
+    {
+      "q": "What is speed?",
+      "level": null,
+      "must_include": [
+        "motion-grade10.md",
+        "motion-al.md"
+      ],
+      "must_exclude": []
+    },
+    {
+      "q": "What is speed?",
+      "level": "OL",
+      "must_include": [
+        "untagged-speed.md"
+      ],
+      "must_exclude": [],
+      "note": "untagged notes stay visible to both levels"
+    }
+  ],
+  "live": [
+    {
+      "id": "si-speed",
+      "q": "වේගය කියන්නේ මොකක්ද?",
+      "reply": "si",
+      "must_include_any": [
+        "වේගය",
+        "speed"
+      ],
+      "tags": [
+        "si",
+        "concept"
+      ]
+    },
+    {
+      "id": "singlish-newton",
+      "q": "Newton 2nd law eka explain karanna",
+      "reply": "si_mixed",
+      "must_include_any": [
+        "F = ma",
+        "F=ma",
+        "ma"
+      ],
+      "tags": [
+        "singlish"
+      ]
+    },
+    {
+      "id": "en-calc",
+      "q": "A car travels 150 km in 2.5 hours. What is its average speed in m/s?",
+      "reply": "en",
+      "must_include_any": [
+        "16.7",
+        "16.67"
+      ],
+      "tags": [
+        "calculation"
+      ]
+    },
+    {
+      "id": "no-source-history",
+      "q": "What are the marks allocated to question 4 of the 2019 History paper?",
+      "reply": "en",
+      "expect_unsure": true,
+      "must_not_include": [
+        "4 marks",
+        "5 marks",
+        "10 marks"
+      ],
+      "tags": [
+        "hallucination"
+      ]
+    },
+    {
+      "id": "misleading-n3",
+      "q": "Newton's third law says force equals mass times acceleration, right?",
+      "reply": "en",
+      "must_include_any": [
+        "not",
+        "incorrect",
+        "second law",
+        "No"
+      ],
+      "tags": [
+        "misleading"
+      ]
+    },
+    {
+      "id": "script-si",
+      "q": "ශ්‍රී ලංකාවේ භෞතික විද්‍යාව ගැන කෙටියෙන් කියන්න",
+      "reply": "si",
+      "tags": [
+        "unicode"
+      ]
+    }
+  ]
+}

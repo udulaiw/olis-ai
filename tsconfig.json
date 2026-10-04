@@ -35,6 +35,8 @@
     "server",
     "scripts/vite-api.ts",
     "scripts/ai-selftest.ts",
-    "vite.config.ts"
+    "vite.config.ts",
+    "scripts/lang-selftest.ts",
+    "scripts/eval.ts"
   ]
 }
