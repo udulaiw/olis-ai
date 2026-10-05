@@ -2,7 +2,9 @@
 // structured sources for the UI (numbered so the model can cite [n]).
 import type { Config } from "./config.js";
 import type { ToolDef } from "./ai/types.js";
-import { searchKnowledge } from "./rag.js";
+import { searchKnowledge, relevantHits } from "./rag.js";
+import { expandQuery } from "./lang/nlp.mjs";
+import { mathCheck, MATH_OPS } from "./mathcheck.js";
 
 export type SourceKind = "notes" | "paper" | "wikipedia" | "web";
 export interface Source {
@@ -56,6 +58,24 @@ export function toolDeclarations(cfg: Config): ToolDef[] {
       },
     },
     {
+      name: "math_check",
+      description:
+        "Deterministic maths checker. Use it to VERIFY arithmetic, unit conversions, derivatives, definite integrals, quadratic roots, or whether a student's simplified expression equals the original. ops: evaluate (expr; supports units like '72 km/h to m/s'), derivative (expr, variable), simplify (expr), integrate_numeric (expr, variable, a, b), quadratic (a, b, c), equivalent (expr, expr2, variable). Write expressions like x^2, sqrt(x), sin(x), 2*x.",
+      parameters: {
+        type: "object",
+        properties: {
+          op: { type: "string", enum: [...MATH_OPS], description: "Which check to run" },
+          expr: { type: "string", description: "Expression (not needed for quadratic)" },
+          expr2: { type: "string", description: "Second expression, for op=equivalent" },
+          variable: { type: "string", description: "Single-letter variable, default x" },
+          a: { type: "string", description: "Number: lower limit (integrate_numeric) or quadratic coefficient a" },
+          b: { type: "string", description: "Number: upper limit (integrate_numeric) or quadratic coefficient b" },
+          c: { type: "string", description: "Number: quadratic coefficient c" },
+        },
+        required: ["op"],
+      },
+    },
+    {
       name: "search_wikipedia",
       description: "Search Wikipedia for encyclopedic background on a concept, person, event or definition. Returns numbered article summaries.",
       parameters: { type: "object", properties: { query: { type: "string", description: "Search terms" } }, required: ["query"] },
@@ -90,14 +110,20 @@ export async function runTool(
   name: string,
   args: Record<string, unknown>,
   reg: SourceRegistry,
-  ctx: { subject?: string; signal?: AbortSignal },
+  ctx: { subject?: string; signal?: AbortSignal; level?: "OL" | "AL" | null },
 ): Promise<ToolRun> {
   const q = String(args.query ?? "").slice(0, 200);
   switch (name) {
+    case "math_check": {
+      const result = mathCheck(args);
+      return { label: result.error ? "Checking the maths (couldn't run that check)" : `Checking the maths: ${String(args.op)}`, sources: [], result };
+    }
+
     case "search_knowledge_base": {
-      const hits = await searchKnowledge(cfg, q, { k: 4, subject: ctx.subject, signal: ctx.signal });
+      // The model may write a Sinhala / Singlish query; search with its English expansion too
+      const hits = relevantHits(await searchKnowledge(cfg, expandQuery(q).expanded, { k: 4, subject: ctx.subject, signal: ctx.signal, level: ctx.level }));
       const sources = hits.map((h) =>
-        reg.add({ kind: "notes", title: `${h.chunk.title} · ${h.chunk.heading}`, url: h.chunk.url, snippet: clip(h.chunk.text.split("\n\n").slice(1).join(" "), 180) }),
+        reg.add({ kind: "notes", title: `${h.chunk.title} · ${h.chunk.heading}${h.chunk.pages ? ` (p.${h.chunk.pages})` : ""}`, url: h.chunk.url, snippet: clip(h.chunk.text.split("\n\n").slice(1).join(" "), 180) }),
       );
       return {
         label: `Searching study notes: “${q}”`,
@@ -110,7 +136,7 @@ export async function runTool(
 
     case "search_past_papers": {
       const year = typeof args.year === "string" && /^\d{4}$/.test(args.year) ? args.year : undefined;
-      const hits = await searchKnowledge(cfg, q, { k: 4, subject: ctx.subject, signal: ctx.signal, types: ["past_paper", "marking_scheme"], year });
+      const hits = relevantHits(await searchKnowledge(cfg, expandQuery(q).expanded, { k: 4, subject: ctx.subject, signal: ctx.signal, types: ["past_paper", "marking_scheme"], year, level: ctx.level }));
       const sources = hits.map((h) =>
         reg.add({
           kind: "paper",

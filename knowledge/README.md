@@ -25,6 +25,31 @@ notes **before** it goes to Wikipedia or the web, and cites them as sources.
 
 Run `npm run index` locally to rebuild the index yourself.
 
+## O/L and A/L
+
+Every note can belong to one exam level. Put the level in the frontmatter (`level: OL` or `level: AL`)
+or use a level folder (`knowledge/ol/science/…`, `knowledge/al/physics/…`); the folder is stripped when
+OLIS works out the subject and type. A note **with** a level is only shown to students of that level;
+a note **without** one (all the original notes) is shown to both, ranked slightly lower. Tag your notes
+as you go, because that is what stops O/L students getting A/L methods (and the reverse).
+
+## Source priority (`tier`)
+
+`tier: 1–7` ranks how authoritative a source is. When two excerpts disagree, OLIS prefers the lower number and
+tells the student about the disagreement. Defaults come from `type`, so you rarely need to set it:
+1 official syllabus · 2 official teacher's guide / textbook · 3 official past paper · 4 official marking scheme ·
+5 government platform (e-Thaksalawa) · 6 notes and other resources · 7 the model's own knowledge (never stored).
+
+## Bulk-adding PDFs
+
+```
+node scripts/ingest.mjs <folder|file.pdf|file.zip> --level ol --subject "Science" --type notes --tier 2 \
+     --source "Grade 10 Science Teacher's Guide (NIE)" --grade 10 [--ocr] [--dry-run]
+```
+Skips duplicates, reports corrupt / scanned / old-font Sinhala PDFs instead of importing garbage, keeps page
+numbers (answers can then say "p.12"), and writes `knowledge/_ingest-report.json`. Review a file or two, then `npm run index`.
+Details: `docs/ol-al-upgrade.md`.
+
 ## Structure
 
 ```
@@ -34,7 +59,7 @@ knowledge/
   past-papers/<subject>/     ← one past-paper question per file (type: past_paper)  see past-papers/README.md
 ```
 
-Optional frontmatter fields on any file: `type` (`notes`, `syllabus`,
+Optional frontmatter fields on any file: `level` (`OL` / `AL`), `grade`, `tier` (1–7), `type` (`notes`, `syllabus`,
 `past_paper`, `marking_scheme`, `resource`), `unit` (a unit ID from
 `server/knowledge/taxonomy.ts`), `year`, `paper`, `question`, `question_type`,
 `difficulty`, `marks`, `language` (`en` / `si`), `verified` (`true` / `false`).

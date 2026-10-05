@@ -13,7 +13,10 @@
 // terms students type), not syllabus content.
 // ─────────────────────────────────────────────
 
+export type ExamLevel = "OL" | "AL";
 export type AlSubjectId = "combined-mathematics" | "physics" | "chemistry";
+export type OlSubjectId = "ol-mathematics" | "ol-science" | "ol-ict" | "ol-english" | "ol-sinhala" | "ol-history" | "ol-geography" | "ol-commerce" | "ol-health" | "ol-religion";
+export type SubjectId = AlSubjectId | OlSubjectId;
 
 export interface Unit {
   id: string;
@@ -24,7 +27,9 @@ export interface Unit {
 }
 
 export interface SubjectTaxonomy {
-  id: AlSubjectId;
+  id: SubjectId;
+  /** G.C.E. Ordinary Level or Advanced Level */
+  level: ExamLevel;
   name: string;
   /** Names the frontend / knowledge frontmatter may use for this subject. */
   aliases: string[];
@@ -36,6 +41,7 @@ const u = (id: string, name: string, keywords: string[]): Unit => ({ id, name, k
 export const TAXONOMY: SubjectTaxonomy[] = [
   {
     id: "combined-mathematics",
+    level: "AL",
     name: "Combined Mathematics",
     aliases: ["combined mathematics", "combined maths", "pure mathematics", "applied mathematics", "maths", "math", "ganithaya", "ගණිතය"],
     units: [
@@ -55,6 +61,7 @@ export const TAXONOMY: SubjectTaxonomy[] = [
   },
   {
     id: "physics",
+    level: "AL",
     name: "Physics",
     aliases: ["physics", "bhouthika", "භෞතික"],
     units: [
@@ -70,6 +77,7 @@ export const TAXONOMY: SubjectTaxonomy[] = [
   },
   {
     id: "chemistry",
+    level: "AL",
     name: "Chemistry",
     aliases: ["chemistry", "rasayana", "රසායන"],
     units: [
@@ -85,13 +93,78 @@ export const TAXONOMY: SubjectTaxonomy[] = [
       u("analytical", "Analytical chemistry", ["analytical", "qualitative analysis", "quantitative analysis", "mole", "stoichiometry", "gravimetric", "volumetric", "chromatography", "spectroscopy", "concentration"]),
     ],
   },
+  // ── G.C.E. Ordinary Level (Grades 10–11) ─────────────────────────────────
+  // Same PROVISIONAL status as the A/L entries above: unit names follow common
+  // classroom usage, not the NIE syllabus wording. Subjects with no units yet
+  // (languages, humanities, commerce…) are listed so routing and level filtering
+  // work; add their units once the syllabus text is in knowledge/syllabus/.
+  {
+    id: "ol-mathematics",
+    level: "OL",
+    name: "Mathematics (O/L)",
+    aliases: ["mathematics", "maths", "math", "o/l maths", "o/l mathematics", "ganithaya", "ගණිතය"],
+    units: [
+      u("ol-number", "Numbers, indices and logarithms", ["indices", "index", "logarithm", "log", "surd", "standard form", "significant figures", "number", "fraction", "decimal"]),
+      u("ol-ratio-percentage", "Ratios, percentages and financial mathematics", ["ratio", "proportion", "percentage", "percent", "interest", "compound interest", "profit", "loss", "discount", "rates", "taxes", "commission"]),
+      u("ol-algebra", "Algebra", ["algebra", "expression", "factorise", "factorisation", "expand", "simplify", "substitution", "formula", "change the subject", "algebraic fraction"]),
+      u("ol-equations", "Equations and inequalities", ["equation", "simultaneous", "linear equation", "quadratic equation", "inequality", "inequalities", "solve for", "root", "discriminant"]),
+      u("ol-sets", "Sets and Venn diagrams", ["set", "sets", "venn", "union", "intersection", "subset", "universal set", "complement"]),
+      u("ol-geometry", "Geometry", ["angle", "triangle", "parallel lines", "polygon", "congruent", "similar triangles", "circle theorem", "chord", "tangent", "pythagoras", "construction", "locus", "bisector"]),
+      u("ol-mensuration", "Mensuration (area and volume)", ["area", "perimeter", "volume", "surface area", "cylinder", "cone", "sphere", "prism", "sector", "arc length", "circumference"]),
+      u("ol-trigonometry", "Trigonometry", ["sin", "cos", "tan", "trigonometry", "trigonometric", "angle of elevation", "angle of depression", "bearing", "right-angled triangle"]),
+      u("ol-graphs", "Graphs and functions", ["graph", "gradient", "straight line", "coordinate", "y = mx", "quadratic graph", "function", "intercept", "plot"]),
+      u("ol-statistics", "Statistics", ["mean", "median", "mode", "range", "frequency table", "histogram", "pie chart", "cumulative frequency", "quartile", "ogive", "statistics"]),
+      u("ol-probability", "Probability", ["probability", "tree diagram", "sample space", "event", "outcome", "chance", "likelihood"]),
+      u("ol-sequences", "Sequences and series", ["sequence", "arithmetic progression", "geometric progression", "nth term", "common difference", "common ratio", "series"]),
+    ],
+  },
+  {
+    id: "ol-science",
+    level: "OL",
+    name: "Science (O/L)",
+    aliases: ["science", "o/l science", "general science", "vidyawa", "විද්‍යාව"],
+    units: [
+      u("ol-motion-forces", "Motion and forces", ["motion", "speed", "velocity", "acceleration", "force", "newton", "momentum", "friction", "gravity", "weight", "mass", "distance-time", "velocity-time"]),
+      u("ol-work-energy", "Work, energy and power", ["work", "energy", "power", "kinetic energy", "potential energy", "conservation of energy", "efficiency", "machine", "lever", "pulley"]),
+      u("ol-pressure", "Pressure and fluids", ["pressure", "density", "upthrust", "archimedes", "floating", "hydraulic", "atmospheric pressure", "barometer"]),
+      u("ol-heat", "Heat and temperature", ["heat", "temperature", "thermometer", "conduction", "convection", "radiation", "specific heat", "latent heat", "expansion"]),
+      u("ol-light-waves", "Light, waves and sound", ["light", "reflection", "refraction", "lens", "mirror", "wave", "sound", "frequency", "wavelength", "echo", "dispersion", "spectrum"]),
+      u("ol-electricity", "Electricity and magnetism", ["current", "voltage", "resistance", "ohm", "circuit", "series", "parallel", "electric", "magnet", "magnetic", "electromagnet", "fuse", "household wiring"]),
+      u("ol-matter-atoms", "Matter, atoms and the periodic table", ["atom", "molecule", "element", "compound", "mixture", "periodic table", "proton", "neutron", "electron", "isotope", "valency", "states of matter"]),
+      u("ol-chem-reactions", "Chemical reactions, acids, bases and salts", ["acid", "base", "alkali", "salt", "ph", "indicator", "neutralisation", "reaction", "rate of reaction", "mole", "chemical equation", "oxidation", "reduction", "rusting"]),
+      u("ol-carbon-metals", "Carbon compounds and metals", ["organic", "hydrocarbon", "alkane", "alkene", "alcohol", "metals", "reactivity series", "extraction of metals", "alloy", "corrosion", "polymer"]),
+      u("ol-cells-organisms", "Cells, nutrition and transport", ["cell", "tissue", "organ", "nutrition", "digestion", "enzyme", "photosynthesis", "respiration", "blood", "heart", "circulation", "transport in plants", "diffusion", "osmosis"]),
+      u("ol-reproduction-genetics", "Reproduction, genetics and evolution", ["reproduction", "gene", "dna", "chromosome", "heredity", "inheritance", "mutation", "evolution", "natural selection", "mitosis", "meiosis"]),
+      u("ol-ecology", "Ecology and the environment", ["ecosystem", "food chain", "food web", "habitat", "population", "pollution", "conservation", "biodiversity", "environment", "nitrogen cycle", "carbon cycle"]),
+    ],
+  },
+  {
+    id: "ol-ict",
+    level: "OL",
+    name: "ICT (O/L)",
+    aliases: ["ict", "information and communication technology", "information technology", "o/l ict", "computer", "තොරතුරු තාක්ෂණය"],
+    units: [
+      u("ol-ict-hardware", "Computer hardware and software", ["hardware", "software", "cpu", "ram", "operating system", "input device", "output device", "storage", "motherboard"]),
+      u("ol-ict-numbers", "Number systems and logic", ["binary", "hexadecimal", "octal", "number system", "logic gate", "boolean", "and gate", "or gate", "not gate", "truth table"]),
+      u("ol-ict-programming", "Programming and algorithms", ["algorithm", "flowchart", "pseudocode", "programming", "loop", "variable", "python", "pascal", "debugging"]),
+      u("ol-ict-database", "Databases and spreadsheets", ["database", "table", "primary key", "query", "spreadsheet", "excel", "formula", "cell reference", "word processing"]),
+      u("ol-ict-networks", "Networks and the internet", ["network", "internet", "lan", "wan", "protocol", "ip address", "email", "browser", "website", "cyber security", "ethics"]),
+    ],
+  },
+  { id: "ol-english", level: "OL", name: "English (O/L)", aliases: ["english", "o/l english", "english language", "ඉංග්‍රීසි"], units: [] },
+  { id: "ol-sinhala", level: "OL", name: "Sinhala Language and Literature (O/L)", aliases: ["sinhala language", "sinhala literature", "o/l sinhala", "සිංහල භාෂාව", "සිංහල සාහිත්‍යය"], units: [] },
+  { id: "ol-history", level: "OL", name: "History (O/L)", aliases: ["history", "o/l history", "ඉතිහාසය"], units: [] },
+  { id: "ol-geography", level: "OL", name: "Geography (O/L)", aliases: ["geography", "o/l geography", "භූගෝල විද්‍යාව"], units: [] },
+  { id: "ol-commerce", level: "OL", name: "Business and Accounting Studies (O/L)", aliases: ["commerce", "business studies", "accounting", "business and accounting", "o/l commerce"], units: [] },
+  { id: "ol-health", level: "OL", name: "Health and Physical Education (O/L)", aliases: ["health", "health and physical education", "o/l health"], units: [] },
+  { id: "ol-religion", level: "OL", name: "Religion (O/L)", aliases: ["buddhism", "religion", "christianity", "catholicism", "islam", "hinduism", "o/l religion"], units: [] },
 ];
 
 const norm = (s: string) => s.toLowerCase();
 
 /** Short keywords ("sin", "ph", "mean") must match as whole words; longer ones may match inside ("derivatives"). */
 function hits(text: string, words: string[]): number {
-  const padded = ` ${text.replace(/[^\p{L}\p{N}∫/'-]+/gu, " ")} `;
+  const padded = ` ${text.replace(/[^\p{L}\p{M}\p{N}∫/'-]+/gu, " ")} `;
   let n = 0;
   for (const w of words) {
     const k = norm(w);
@@ -102,16 +175,21 @@ function hits(text: string, words: string[]): number {
 }
 
 export interface TopicGuess {
-  subject: AlSubjectId;
+  subject: SubjectId;
   unit: Unit;
   score: number;
 }
 
-/** Best-guess subject + unit for a question (routing and past-paper tagging). */
-export function guessTopic(text: string, subjectHint?: string): TopicGuess | null {
+/**
+ * Best-guess subject + unit for a question (routing and past-paper tagging).
+ * `level` restricts the search to one exam level; pass the student's level
+ * whenever it is known so O/L questions never route into A/L units (and back).
+ */
+export function guessTopic(text: string, subjectHint?: string, level?: ExamLevel | null): TopicGuess | null {
   const t = norm(text);
   let best: TopicGuess | null = null;
   for (const s of TAXONOMY) {
+    if (level && s.level !== level) continue;
     const boost = subjectHint && (norm(subjectHint) === norm(s.name) || s.aliases.includes(norm(subjectHint))) ? 1 : 0;
     for (const unit of s.units) {
       const score = hits(t, unit.keywords) + (hits(t, s.aliases) ? 1 : 0) + boost;
@@ -121,6 +199,19 @@ export function guessTopic(text: string, subjectHint?: string): TopicGuess | nul
   return best && best.score >= 2 ? best : null;
 }
 
+/** Subject only (works for subjects that have no units yet, e.g. History). */
+export function guessSubject(text: string, subjectHint?: string, level?: ExamLevel | null): SubjectTaxonomy | null {
+  const t = norm(text);
+  let best: { s: SubjectTaxonomy; score: number } | null = null;
+  for (const s of TAXONOMY) {
+    if (level && s.level !== level) continue;
+    const hint = subjectHint && (norm(subjectHint) === norm(s.name) || s.aliases.includes(norm(subjectHint))) ? 1 : 0;
+    const score = hits(t, s.aliases) * 2 + s.units.reduce((n, un) => n + Math.min(2, hits(t, un.keywords)), 0) + hint;
+    if (score > (best?.score ?? 0)) best = { s, score };
+  }
+  return best && best.score >= 2 ? best.s : null;
+}
+
 export function subjectByName(name: string | undefined): SubjectTaxonomy | undefined {
   if (!name) return undefined;
   const n = norm(name);
@@ -128,7 +219,8 @@ export function subjectByName(name: string | undefined): SubjectTaxonomy | undef
 }
 
 /** Compact unit list for the system prompt ("what topic is this testing?"). */
-export function taxonomyPromptBlock(subjectName?: string): string {
-  const list = subjectByName(subjectName) ? [subjectByName(subjectName)!] : TAXONOMY;
+export function taxonomyPromptBlock(subjectName?: string, level?: ExamLevel | null): string {
+  const one = subjectByName(subjectName);
+  const list = one && (!level || one.level === level) ? [one] : TAXONOMY.filter((s) => (!level || s.level === level) && s.units.length);
   return list.map((s) => `${s.name}: ${s.units.map((x) => x.name).join(" · ")}`).join("\n");
 }

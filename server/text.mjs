@@ -1,6 +1,8 @@
 // Shared text utilities for the OLIS knowledge base.
 // Plain JS (.mjs) so the build-time indexer (scripts/build-index.mjs) and the
 // TypeScript server can use the exact same tokenizer and chunker.
+import { cleanSinhala } from "./lang/unicode.mjs";
+import { stemSinhala } from "./lang/nlp.mjs";
 
 const STOP = new Set(
   (
@@ -12,12 +14,22 @@ const STOP = new Set(
   ).split(" "),
 );
 
-/** @param {string} text @returns {string[]} */
+// Sinhala function words: dropped before stemming so they don't dominate BM25.
+const SI_STOP = new Set(["සහ", "හා", "හෝ", "නමුත්", "ඒ", "මේ", "ඒක", "මේක", "ඒකේ", "මේකේ", "යනු", "වන", "වූ", "ද", "කරන්න", "කරමු", "දෙන්න", "එක", "එකක්", "මොකක්ද", "මොකක්", "මොකද", "කොහොමද", "කොහොම", "ඇයි", "කියන්නේ", "කුමක්ද", "කුමක්", "නම්", "තමයි", "තියෙන්නේ", "වෙන්නේ", "ඉතා", "ගැන", "පිළිබඳ", "ඔබ"]);
+
+/**
+ * Words for search. Sinhala text is kept in NFC (NFKD would split ො/ෝ/ෞ into
+ * separate code points, so what the student types and what the index holds
+ * would differ) and light-stemmed so වේගය / වේගයේ / වේගයෙන් all match.
+ * @param {string} text @returns {string[]}
+ */
 export function tokenize(text) {
-  // Latin words + Sinhala words (U+0D80–U+0DFF) so Sinhala notes and questions are searchable too
-  return (text.toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").match(/[a-z0-9]+|[\u0D80-\u0DFF\u200D]+/g) ?? [])
-    .filter((w) => w.length > 1 && !STOP.has(w))
-    .map((w) => (w.length > 4 && w.endsWith("ies") ? w.slice(0, -3) + "y" : w.length > 3 && w.endsWith("s") && !w.endsWith("ss") ? w.slice(0, -1) : w));
+  const t = cleanSinhala(text)
+    .toLowerCase()
+    .replace(/[\u00C0-\u024F]+/g, (seg) => seg.normalize("NFKD").replace(/[\u0300-\u036f]/g, "")); // fold Latin accents only
+  return (t.match(/[a-z0-9]+|[\u0D80-\u0DFF\u200D]+/g) ?? [])
+    .filter((w) => w.length > 1 && !STOP.has(w) && !SI_STOP.has(w))
+    .map((w) => (/[\u0D80-\u0DFF]/.test(w) ? stemSinhala(w) : w.length > 4 && w.endsWith("ies") ? w.slice(0, -3) + "y" : w.length > 3 && w.endsWith("s") && !w.endsWith("ss") ? w.slice(0, -1) : w));
 }
 
 /**

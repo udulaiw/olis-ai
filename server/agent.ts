@@ -12,12 +12,13 @@
 // Emits events the browser renders live: steps, sources, text, notice, rewind.
 // ─────────────────────────────────────────────
 import type { Config } from "./config.js";
-import { searchKnowledge } from "./rag.js";
+import { searchKnowledge, groundingOf, relevantHits, type Grounding } from "./rag.js";
 import { SourceRegistry, runTool, toolDeclarations, type Source } from "./tools.js";
 import { systemPrompt, type LearningContext, type StudentProfile } from "./prompts.js";
 import { classifyRequest } from "./ai/intent.js";
 import { streamWithFallback } from "./ai/router.js";
-import { newRequestId } from "./ai/log.js";
+import { newRequestId, aiLog } from "./ai/log.js";
+import { createScriptGuard } from "./lang/unicode.mjs";
 import type { ChatMessage, ImageInput, ToolCall } from "./ai/types.js";
 
 export type AgentEvent =
@@ -49,6 +50,8 @@ function stepLabel(call: ToolCall) {
       return `Searching the web: “${a.query}”`;
     case "search_past_papers":
       return `Checking past papers: “${a.query}”`;
+    case "math_check":
+      return "Checking the maths";
     case "read_webpage":
       try {
         return `Reading ${new URL(String(a.url)).hostname}`;
@@ -75,20 +78,30 @@ export async function* runAgent(cfg: Config, req: AgentRequest, signal?: AbortSi
     imageCount: req.images?.length ?? 0,
     attachmentChars: req.attachment?.length ?? 0,
     languagePref: req.profile?.language,
+    history,
+    stream: req.profile?.stream,
+    examLevel: req.profile?.examLevel,
   });
-  const system = systemPrompt(req.context, req.mode, { tools: true, webSearch: Boolean(cfg.tavilyKey), profile: req.profile, detectedLanguage: cls.language });
   let stepN = 0;
 
-  // 1) RAG: always check the curated notes first (cheap, grounded, citeable)
+  // 1) RAG: always check the curated notes first (cheap, grounded, citeable).
+  //    Search with the normalised/expanded query (Sinhala + Singlish → English terms) and,
+  //    for follow-ups like "මේක තේරෙන්නෙ නෑ", with the topic of the previous question.
   let kbBlock = "";
+  let grounding: Grounding | undefined;
   if (req.mode !== "summarize" && !TRIVIAL.test(question.trim()) && question.trim().length > 3) {
     const id = `s${++stepN}`;
     yield { type: "step", id, label: "Checking OLIS study notes", status: "running" };
-    const hits = await searchKnowledge(cfg, question, { k: 4, subject: req.context.subject, signal }).catch(() => []);
+    const found = await searchKnowledge(cfg, cls.retrievalQuery, { k: 4, subject: req.context.subject, signal, level: cls.examLevel }).catch(() => []);
+    // Hits that only matched generic words ("marks", "question") are not evidence: don't show them or let the model cite them
+    if (!req.attachment) grounding = groundingOf(found);
+    // ...and when the verdict is "none", the incidental matches are not shown either (the model can still call search_knowledge_base itself)
+    const hits = grounding === "none" ? [] : relevantHits(found);
+    aiLog({ evt: "ai.retrieval", requestId, route: "agent", grounding: grounding ?? "n/a", hits: hits.length, level: cls.examLevel ?? "unknown", specialist: cls.specialist, reply: cls.reply });
     const srcs = hits.map((h) =>
       reg.add({
         kind: h.chunk.type === "past_paper" || h.chunk.type === "marking_scheme" ? "paper" : "notes",
-        title: `${h.chunk.title} · ${h.chunk.heading}`,
+        title: `${h.chunk.title} · ${h.chunk.heading}${h.chunk.pages ? ` (p.${h.chunk.pages})` : ""}`,
         url: h.chunk.url,
         snippet: clip(h.chunk.text.split("\n\n").slice(1).join(" "), 180),
       }),
@@ -102,16 +115,35 @@ export async function* runAgent(cfg: Config, req: AgentRequest, signal?: AbortSi
     if (srcs.length) {
       yield { type: "sources", sources: [...reg.list] };
       kbBlock =
-        "<knowledge_excerpts>\nCurated OLIS notes. Cite by number if you use them.\n\n" +
+        "<knowledge_excerpts>\nCurated OLIS notes. Cite by number if you use them. Lower tier = more authoritative (1 official syllabus … 6 notes).\n\n" +
         hits
           .map((h, i) => {
-            const meta = [h.chunk.type && h.chunk.type !== "notes" ? h.chunk.type : "", h.chunk.year, h.chunk.paper, h.chunk.question ? `Q${h.chunk.question}` : ""].filter(Boolean).join(" · ");
+            const meta = [h.chunk.type && h.chunk.type !== "notes" ? h.chunk.type : "", h.chunk.level === "OL" ? "O/L" : h.chunk.level === "AL" ? "A/L" : "", h.chunk.year, h.chunk.paper, h.chunk.question ? `Q${h.chunk.question}` : "", h.chunk.tier ? `tier ${h.chunk.tier}` : ""].filter(Boolean).join(" · ");
             return `[${srcs[i].ref}] ${srcs[i].title}${meta ? ` (${meta})` : ""}\n${clip(h.chunk.text, 1400)}`;
           })
           .join("\n\n---\n\n") +
         "\n</knowledge_excerpts>";
     }
   }
+
+  const buildSystem = (scriptRetry = false) =>
+    systemPrompt(req.context, req.mode, {
+      tools: true,
+      webSearch: Boolean(cfg.tavilyKey),
+      profile: req.profile,
+      reply: cls.reply,
+      examLevel: cls.examLevel,
+      specialist: cls.specialist,
+      grounding,
+      terms: cls.terms,
+      followUpHint: cls.followUp?.hint,
+      scriptRetry,
+    });
+  let system = buildSystem();
+  // The script the answer must stay in. Off when the student themselves is working in Hindi/Tamil.
+  const allowOtherScripts = /hindi|devanagari|tamil|தமிழ்|हिन्दी/i.test(question) || /[\u0900-\u097F\u0B80-\u0BFF]/.test(question);
+  const expectScript = allowOtherScripts ? "any" : cls.reply === "ta" ? "ta" : cls.reply === "en" ? "en" : "si";
+  let scriptRetried = false;
 
   // 2) Build the conversation (neutral format; the router adapts it per provider)
   const hasImages = Boolean(req.images?.length);
@@ -142,45 +174,66 @@ export async function* runAgent(cfg: Config, req: AgentRequest, signal?: AbortSi
     let native: unknown = undefined;
     let nativeProvider: string | undefined;
 
-    for await (const ev of streamWithFallback({
-      task: cls.task,
-      required: cls.required,
-      req: { system, messages, tools: decls, forceAnswer: last },
-      prefer: served,
-      signal,
-      deadline,
-      requestId,
-      route: "agent",
-    })) {
-      switch (ev.type) {
-        case "attempt":
-          served = ev.key;
-          nativeProvider = ev.provider;
-          break;
-        case "text":
-          text += ev.delta;
-          emitted += ev.delta.length;
-          wroteText = true;
-          yield { type: "text", delta: ev.delta };
-          break;
-        case "tool_call":
-          calls.push(ev.call);
-          break;
-        case "native":
-          native = ev.data;
-          break;
-        case "rewind":
-          // The engine failed after writing part of this turn: throw that part away
-          text = "";
-          calls = [];
-          native = undefined;
-          emitted = turnStart;
-          yield { type: "rewind", to: turnStart };
-          break;
-        case "switching":
-          yield { type: "notice", kind: "switching" };
-          break;
+    for (;;) {
+      const guard = createScriptGuard(expectScript);
+      let bad: { code: string; detail: string } | null = null;
+      for await (const ev of streamWithFallback({
+        task: cls.task,
+        required: cls.required,
+        req: { system, messages, tools: decls, forceAnswer: last },
+        prefer: served,
+        signal,
+        deadline,
+        requestId,
+        route: "agent",
+      })) {
+        switch (ev.type) {
+          case "attempt":
+            served = ev.key;
+            nativeProvider = ev.provider;
+            break;
+          case "text": {
+            // Wrong-script output (Devanagari/Tamil/U+FFFD in a Sinhala or English answer): stop, discard, retry once
+            const b = scriptRetried ? null : guard(ev.delta);
+            if (b) {
+              bad = b;
+              break;
+            }
+            text += ev.delta;
+            emitted += ev.delta.length;
+            wroteText = true;
+            yield { type: "text", delta: ev.delta };
+            break;
+          }
+          case "tool_call":
+            calls.push(ev.call);
+            break;
+          case "native":
+            native = ev.data;
+            break;
+          case "rewind":
+            // The engine failed after writing part of this turn: throw that part away
+            text = "";
+            calls = [];
+            native = undefined;
+            emitted = turnStart;
+            yield { type: "rewind", to: turnStart };
+            break;
+          case "switching":
+            yield { type: "notice", kind: "switching" };
+            break;
+        }
+        if (bad) break;
       }
+      if (!bad) break;
+      scriptRetried = true;
+      aiLog({ evt: "ai.script_guard", requestId, route: "agent", error: bad.code, detail: bad.detail, model: served, reply: cls.reply });
+      if (emitted > turnStart) yield { type: "rewind", to: turnStart };
+      text = "";
+      calls = [];
+      native = undefined;
+      emitted = turnStart;
+      system = buildSystem(true);
     }
 
     messages.push({
@@ -202,7 +255,7 @@ export async function* runAgent(cfg: Config, req: AgentRequest, signal?: AbortSi
       yield { type: "step", id, label: pending, status: "running" };
       let result: Record<string, unknown>;
       try {
-        const run = await runTool(cfg, call.name, call.args, reg, { subject: req.context.subject, signal });
+        const run = await runTool(cfg, call.name, call.args, reg, { subject: req.context.subject, signal, level: cls.examLevel });
         result = run.result;
         yield { type: "step", id, label: run.label, status: result.error ? "failed" : "done" };
         if (run.sources.length) yield { type: "sources", sources: [...reg.list] };

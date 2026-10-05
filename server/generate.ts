@@ -1,7 +1,8 @@
 // Structured generation (quiz, flashcards), grounded in the knowledge base.
 // Goes through the AI router, so it falls back across engines like chat does.
 import type { Config } from "./config.js";
-import { searchKnowledge } from "./rag.js";
+import { searchKnowledge, relevantHits } from "./rag.js";
+import { expandQuery, detectExamLevel } from "./lang/nlp.mjs";
 import { systemPrompt, type LearningContext, type StudentProfile } from "./prompts.js";
 import { generateJSONWithFallback } from "./ai/router.js";
 import { newRequestId } from "./ai/log.js";
@@ -25,8 +26,8 @@ export interface GenerateRequest {
   profile?: StudentProfile;
 }
 
-async function grounding(cfg: Config, topic: string, subject?: string, signal?: AbortSignal) {
-  const hits = await searchKnowledge(cfg, topic, { k: 4, subject, signal }).catch(() => []);
+async function grounding(cfg: Config, topic: string, subject?: string, level?: "OL" | "AL" | null, signal?: AbortSignal) {
+  const hits = relevantHits(await searchKnowledge(cfg, expandQuery(topic).expanded, { k: 4, subject, signal, level }).catch(() => []));
   const sources: Source[] = hits.map((h, i) => ({
     ref: i + 1,
     kind: "notes",
@@ -42,8 +43,10 @@ async function grounding(cfg: Config, topic: string, subject?: string, signal?: 
 
 export async function generate(cfg: Config, req: GenerateRequest, signal?: AbortSignal) {
   const topic = req.topic.slice(0, 200) || req.subject || req.context.subject;
-  const { block, sources } = await grounding(cfg, topic, req.subject, signal);
-  const system = systemPrompt(req.context, "quiz", { tools: false, webSearch: false, profile: req.profile });
+  const level = detectExamLevel({ question: topic, stream: req.profile?.stream, examLevel: req.profile?.examLevel, subject: req.subject ?? req.context.subject });
+  const levelName = level === "OL" ? "O/L (Grades 10–11)" : "A-Level";
+  const { block, sources } = await grounding(cfg, topic, req.subject, level, signal);
+  const system = systemPrompt(req.context, "quiz", { tools: false, webSearch: false, profile: req.profile, examLevel: level, reply: req.profile?.language === "si" ? "si_mixed" : "en" });
   const common = { task: "structured" as const, required: [], signal, deadline: Date.now() + cfg.generateDeadlineMs, requestId: newRequestId(), route: "generate", system };
   const lang = req.profile?.language === "si" ? " Write the questions and explanations in Sinhala, keeping technical terms in English." : "";
 
@@ -51,7 +54,7 @@ export async function generate(cfg: Config, req: GenerateRequest, signal?: Abort
     const n = Math.min(10, Math.max(3, req.count ?? 5));
     const { data } = await generateJSONWithFallback({
       ...common,
-      prompt: `${block}Create a ${n}-question multiple-choice quiz on "${topic}" (${req.subject ?? req.context.subject}), difficulty: ${req.difficulty ?? "Mixed"}, for a ${req.context.level} A-Level student.${lang}
+      prompt: `${block}Create a ${n}-question multiple-choice quiz on "${topic}" (${req.subject ?? req.context.subject}), difficulty: ${req.difficulty ?? "Mixed"}, for a ${req.context.level} ${levelName} student.${lang}
 Return JSON exactly like: {"title": string, "questions": [{"q": string, "options": [4 strings], "answer": 0-3, "explanation": string, "difficulty": "Easy"|"Medium"|"Hard"}]}
 Rules: one clearly correct answer; plausible distractors based on real misconceptions; explanations 1–2 sentences; LaTeX ($…$) for maths. These are OLIS practice questions: don't claim they come from past papers.`,
       validate: (v) => {
@@ -67,7 +70,7 @@ Rules: one clearly correct answer; plausible distractors based on real misconcep
 
   const { data } = await generateJSONWithFallback({
     ...common,
-    prompt: `${block}Create 8 concise revision flashcards on "${topic}" for a ${req.context.level} ${req.subject ?? req.context.subject} student.${lang}
+    prompt: `${block}Create 8 concise revision flashcards on "${topic}" for a ${req.context.level} ${levelName} ${req.subject ?? req.context.subject} student.${lang}
 Return JSON exactly like: {"title": string, "cards": [{"front": string, "back": string}]}
 Fronts are questions or prompts; backs are short, exam-accurate answers. LaTeX ($…$) for maths.`,
     validate: (v) => {

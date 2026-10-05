@@ -381,6 +381,64 @@ await test("17. logs: no keys, no student text", async () => {
   assert(!all.includes("MY SECRET QUESTION"), "student text was logged");
 });
 
+await test("18. wrong-script answer (Devanagari in Sinhala reply) → rewind + retry, no corrupted text shown", async () => {
+  const q = "ගුරුත්වාකර්ෂණ බලය කියන්නේ මොකක්ද?";
+  const good = "ගුරුත්වාකර්ෂණ බලය කියන්නේ වස්තු එකිනෙක ආකර්ෂණය කරන බලයයි.";
+  behaviours["gemini-3.5-flash"] = [{ kind: "text", text: "यह गुरुत्वाकर्षण बल है" }, { kind: "text", text: good }];
+  process.env.OLIS_AI_LOGS = "";
+  const { events, text } = await readSSE(await agentPOST(apiRequest("/api/agent", agentBody(q))));
+  assert(!/[\u0900-\u097F]/.test(text), `Devanagari reached the student: ${text}`);
+  assert(text === good, `text=${text}`);
+  assert(events.some((e) => e.type === "rewind") || !events.some((e) => e.type === "text" && /[\u0900-\u097F]/.test(e.delta ?? "")), "bad delta was streamed without rewind");
+  const retry = calls.filter((c) => c.model === "gemini-3.5-flash")[1]?.body as { systemInstruction: { parts: { text: string }[] } };
+  assert(retry?.systemInstruction.parts[0].text.includes("wrong script"), "retry prompt lacks the script instruction");
+  const all = logs.join("\n");
+  assert(all.includes('"evt":"ai.script_guard"') && !all.includes("गुरुत्वाकर्षण"), "script guard not logged, or student/model text logged");
+});
+
+await test("19. Sinhala (ZWJ conjuncts) survives the API round trip byte-for-byte", async () => {
+  const q = "ශ්‍රී ලංකාවේ විද්‍යාව ගැන කියන්න";
+  const answer = "ශ්‍රී ලංකාව; විද්‍යාව; භෞතික විද්‍යාව; රසායන විද්‍යාව; ගණිතය. Newton's second law එක: $F=ma$";
+  behaviours["gemini-3.5-flash"] = [{ kind: "text", text: answer }];
+  const { text } = await readSSE(await agentPOST(apiRequest("/api/agent", agentBody(q.normalize("NFD")))));
+  assert(text === answer, `text differs: ${text}`);
+  const sent = JSON.stringify(calls.find((c) => c.model.startsWith("gemini"))!.body);
+  assert(!sent.includes("\\ufffd") && !sent.includes("\ufffd"), "replacement character in request");
+  assert(sent.includes("ශ්‍රී"), "student's Sinhala was not sent in NFC");
+});
+
+await test("20. follow-up 'මේක තේරෙන්නෙ නෑ' → refers back; retrieval uses the previous topic", async () => {
+  const body = agentBody("මේක තේරෙන්නෙ නෑ", { messages: [{ role: "user", content: "Explain Newton's second law" }, { role: "assistant", content: "F = ma ..." }, { role: "user", content: "මේක තේරෙන්නෙ නෑ" }] });
+  const { text } = await readSSE(await agentPOST(apiRequest("/api/agent", body)));
+  assert(text.length > 0, "no answer");
+  const sys = (calls.find((c) => c.model.startsWith("gemini"))!.body as { systemInstruction: { parts: { text: string }[] } }).systemInstruction.parts[0].text;
+  assert(sys.includes("This message is a follow-up") && sys.includes("Newton's second law"), "follow-up hint missing");
+  const user = JSON.stringify(calls.find((c) => c.model.startsWith("gemini"))!.body);
+  assert(user.includes("newtons-laws") || user.includes("Newton"), "no Newton notes retrieved for the follow-up");
+});
+
+await test("21. no matching source → model is told not to present syllabus facts as confirmed", async () => {
+  await readSSE(await agentPOST(apiRequest("/api/agent", agentBody("What are the marks allocated to question 4 of the 2019 History paper?"))));
+  const sys = (calls.find((c) => c.model.startsWith("gemini"))!.body as { systemInstruction: { parts: { text: string }[] } }).systemInstruction.parts[0].text;
+  assert(sys.includes("No OLIS source matched"), "grounding=none block missing");
+});
+
+await test("22. exam level: O/L profile → O/L depth rule, no A/L-only methods", async () => {
+  await readSSE(await agentPOST(apiRequest("/api/agent", agentBody("explain speed", { profile: { examLevel: "OL", language: "en" } }))));
+  const sys = (calls.find((c) => c.model.startsWith("gemini"))!.body as { systemInstruction: { parts: { text: string }[] } }).systemInstruction.parts[0].text;
+  assert(sys.includes("preparing for G.C.E. O/L") && !sys.includes("Combined Mathematics: Algebra"), "O/L level block missing or A/L taxonomy leaked");
+});
+
+await test("23. math_check tool runs deterministically and its result is returned to the model", async () => {
+  behaviours["gemini-3.5-flash-lite"] = [{ kind: "tool_then_text", call: { name: "math_check", args: { op: "evaluate", expr: "sqrt(3^2+4^2)" } }, text: "The hypotenuse is 5." }];
+  const { events, text } = await readSSE(await agentPOST(apiRequest("/api/agent", agentBody("what is the hypotenuse of a 3-4 right triangle? check it carefully"))));
+  const second = calls.filter((c) => c.model === "gemini-3.5-flash-lite")[1]?.body as { contents: { parts: { functionResponse?: { name: string; response: unknown } }[] }[] };
+  const fr = second?.contents.flatMap((c) => c.parts).find((p) => p.functionResponse)?.functionResponse;
+  assert(fr?.name === "math_check" && JSON.stringify(fr.response).includes('"5"'), `tool result not returned: ${JSON.stringify(fr)}`);
+  assert(events.some((e) => e.type === "step" && e.label?.includes("maths")), "no maths step shown");
+  assert(text.includes("5"), `text=${text}`);
+});
+
 // ── Report ─────────────────────────────────────
 globalThis.fetch = realFetch;
 console.log = realLog;

@@ -4,7 +4,7 @@ import { useState, type KeyboardEvent } from "react";
 import { useStore } from "../store/AppStore";
 import { Icon } from "./Icon";
 import { cx } from "../lib/utils";
-import { LANGUAGES, PROFILE_SUBJECTS, STREAMS, type Depth } from "../types";
+import { EXAM_LEVELS, LANGUAGES, PROFILE_SUBJECTS, STREAMS, type Depth } from "../types";
 
 const DEPTHS: { id: Depth; label: string; hint: string }[] = [
   { id: "quick", label: "Quick", hint: "Key idea + essential steps" },
@@ -74,6 +74,16 @@ export function StudyProfileEditor() {
 
   return (
     <div className="space-y-5">
+      <Field label="Exam level" htmlFor="pf-level">
+        <div className="segmented w-full" role="group" aria-label="Exam level" id="pf-level">
+          {EXAM_LEVELS.map((l) => (
+            <button key={l.id || "none"} type="button" className="flex-1 justify-center" aria-pressed={(p.examLevel ?? "") === l.id} onClick={() => setProfile({ examLevel: l.id })}>
+              {l.label}
+            </button>
+          ))}
+        </div>
+      </Field>
+
       <div className="grid gap-5 sm:grid-cols-2">
         <Field label="A/L stream" htmlFor="pf-stream">
           <select id="pf-stream" className="field" value={p.stream} onChange={(e) => setProfile({ stream: e.target.value })}>

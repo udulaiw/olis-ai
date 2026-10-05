@@ -26,6 +26,14 @@ export const LANGUAGES: { id: Language; label: string }[] = [
 
 export type Depth = "quick" | "standard" | "deep";
 
+/** Which G.C.E. exam the student is preparing for ("" = not set). */
+export type ExamLevel = "" | "OL" | "AL";
+export const EXAM_LEVELS: { id: ExamLevel; label: string }[] = [
+  { id: "", label: "Not set" },
+  { id: "OL", label: "O/L" },
+  { id: "AL", label: "A/L" },
+];
+
 /**
  * Non-sensitive learning preferences, saved in this browser only and sent with
  * each request so OLIS can tailor answers.
@@ -38,10 +46,11 @@ export interface StudyProfile {
   currentTopic: string;
   weakTopics: string[];
   goals: string;
+  examLevel?: ExamLevel;
 }
 
 export const STREAMS = ["", "Physical Science (Maths)", "Biological Science", "Commerce", "Arts", "Technology", "Other"] as const;
-export const PROFILE_SUBJECTS = ["Combined Mathematics", "Physics", "Chemistry", "Biology", "ICT", "Other"] as const;
+export const PROFILE_SUBJECTS = ["Combined Mathematics", "Physics", "Chemistry", "Biology", "ICT", "Mathematics (O/L)", "Science (O/L)", "English", "Sinhala", "History", "Geography", "Commerce", "Other"] as const;
 
 /** What the student wants OLIS to do. "ask" = auto-detect from the message. */
 export type Mode = "ask" | "explain" | "solve" | "plan" | "quiz" | "summarize" | "simplify";
