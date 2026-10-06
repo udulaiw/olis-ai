@@ -1,0 +1,527 @@
+{
+  "$comment": "OLIS subject registry. PROVISIONAL: unit names follow common Sri Lankan O/L and A/L usage, not official NIE syllabus wording. Edit this file to add a subject, unit or alias; no code changes are needed. See docs/subject-architecture.md.",
+  "version": 1,
+  "strategies": {
+    "mathematics": {"task": "mathematics", "label": "Mathematics", "prompt": "Mathematics method: write what is GIVEN, the FORMULA or principle, the SUBSTITUTION, each line of WORKING, then the ANSWER on its own line (> **Answer:** …). Never skip a step a marker would look for. Verify the result (substitute back, or a second method) and use math_check for arithmetic, roots, derivatives and numeric integrals before stating the final answer."},
+    "physics": {"task": "physics", "label": "Physics", "prompt": "Physics method: list the KNOWN values with units and the UNKNOWN, state the principle or law, choose the equation and define every symbol, substitute with units, calculate (use math_check), give the answer with correct units and sensible significant figures, then check it is physically reasonable (sign, size, units/dimensions). Explain what the result means physically. State any assumptions."},
+    "chemistry": {"task": "chemistry", "label": "Chemistry", "prompt": "Chemistry method: write balanced equations with state symbols, conditions and observations. Keep mole calculations explicit (n = m/M, c = n/V) and use math_check for the arithmetic. For organic mechanisms name each step and the reagent. Only state reactions, products and conditions that are well established; if you are not sure a reaction happens as described, say so instead of guessing."},
+    "biology": {"task": "general", "label": "Biology", "prompt": "Biology method: give precise definitions in syllabus terminology, describe processes as ordered stages, link structure to function, and describe any diagram in words (what to draw and which parts to label). Use correct classification and scientific names."},
+    "science": {"task": "general", "label": "Science", "prompt": "Science method: definition first in textbook wording, then the explanation, an everyday Sri Lankan example, and units for every quantity. For calculations: known values, formula, substitution, answer with units."},
+    "geography": {"task": "general", "label": "Geography", "prompt": "Geography method: structure answers as causes → processes → effects (or location → characteristics → significance). Use Sri Lankan examples where relevant (monsoons, climatic zones, Mahaweli, central highlands). Any statistic (population, rainfall, production) must name its source and year; if you only know an old figure, say it may be outdated. For maps, describe positions with directions, scale and grid references."},
+    "history": {"task": "general", "label": "History", "prompt": "History method: give a clear chronology, then causes, events, key people and consequences. Dates, names and figures must come from the excerpts or be things you are certain of; otherwise say you cannot confirm them. Separate established fact from historians' interpretation. For comparison questions use a table."},
+    "social_science": {"task": "general", "label": "Social science", "prompt": "Social-science method: define the key term, explain the concept or model, give a Sri Lankan example, and evaluate (advantages / limitations) when the question asks to discuss. Current figures, laws and office-holders must name a source and year."},
+    "logic": {"task": "reasoning", "label": "Logic", "prompt": "Logic method: put arguments in standard form (premises, conclusion), name the form or fallacy, and test validity explicitly (truth table, Venn diagram or rules of inference). Show every step of a truth table."},
+    "language": {"task": "general", "label": "Language", "prompt": "Language method. When correcting the student's writing use exactly this order: **Your version** → **Corrected version** → **Why** (each error and the rule) → **A stronger alternative**. Be kind and specific. For essays and letters show the structure (introduction, body, conclusion; format of a formal letter). For literature, only discuss texts or passages the student gives you or that appear in the excerpts. For translation, keep the meaning and register, not a word-for-word copy."},
+    "ict": {"task": "reasoning", "label": "ICT", "prompt": "ICT method: use precise terms. For code give correct, complete code in a fenced block, then explain how it works; show the expected output or a trace table. For number systems show the conversion digit by digit. For databases show the table/SQL. For networks name the layer or protocol involved."},
+    "religion": {"task": "general", "label": "Religion", "prompt": "Religion method: academic, respectful and neutral; explain teachings as the tradition itself presents them. Use original terms (Pali, Sanskrit) with their meaning. Attribute a quotation to a text only if you are certain of the source."},
+    "general": {"task": "general", "label": "General", "prompt": ""}
+  },
+  "subjects": [
+    {
+      "id": "combined-mathematics",
+      "level": "AL",
+      "name": "Combined Mathematics",
+      "group": "mathematics",
+      "strategy": "mathematics",
+      "languages": ["si", "en", "ta"],
+      "enabled": true,
+      "aliases": ["combined mathematics", "combined maths", "pure mathematics", "applied mathematics", "maths", "math", "ganithaya", "ගණිතය", "இணைந்த கணிதம்"],
+      "prompt": "Pure and Applied Mathematics at A/L depth. Name the theorem or identity used at each step.",
+      "units": [
+        {"id": "algebra", "name": "Algebra", "keywords": ["algebra", "polynomial", "quadratic", "inequality", "binomial", "series", "sequence", "permutation", "combination", "induction", "partial fraction", "logarithm"], "patterns": ["[a-z]\\s*(?:\\^\\s*2|²)"]},
+        {"id": "functions", "name": "Functions", "keywords": ["function", "domain", "range", "inverse function", "composite", "modulus function", "graph of"]},
+        {"id": "trigonometry", "name": "Trigonometry", "keywords": ["trigonometry", "trig", "sin", "cos", "tan", "sine rule", "cosine rule", "identity", "radian", "inverse trig"]},
+        {"id": "calculus", "name": "Calculus (limits and continuity)", "keywords": ["limit", "continuity", "calculus", "first principles"]},
+        {"id": "differentiation", "name": "Differentiation", "keywords": ["differentiate", "differentiation", "derivative", "d/dx", "dy/dx", "stationary point", "maximum", "minimum", "rate of change", "tangent", "normal", "implicit", "parametric"]},
+        {"id": "integration", "name": "Integration", "keywords": ["integrate", "integration", "integral", "∫", "area under", "by parts", "substitution", "definite integral", "volume of revolution"]},
+        {"id": "complex-numbers", "name": "Complex numbers", "keywords": ["complex number", "argand", "modulus", "argument", "conjugate", "de moivre", "imaginary"]},
+        {"id": "vectors", "name": "Vectors", "keywords": ["vector", "dot product", "scalar product", "position vector", "unit vector"]},
+        {"id": "matrices", "name": "Matrices", "keywords": ["matrix", "matrices", "determinant", "inverse matrix", "transpose"]},
+        {"id": "coordinate-geometry", "name": "Coordinate geometry", "keywords": ["straight line", "gradient", "circle", "coordinate", "locus", "parabola", "ellipse", "equation of a line"]},
+        {"id": "mechanics", "name": "Mechanics (applied mathematics)", "keywords": ["statics", "dynamics", "particle", "equilibrium", "resultant", "friction", "projectile", "moment", "couple", "work energy", "impulse", "circular motion", "simple harmonic", "centre of mass", "frameworks", "relative velocity"]},
+        {"id": "statistics-probability", "name": "Statistics and probability", "keywords": ["probability", "statistics", "mean", "variance", "standard deviation", "distribution", "bayes", "conditional probability", "median", "mode"]}
+      ]
+    },
+    {
+      "id": "physics",
+      "level": "AL",
+      "name": "Physics",
+      "group": "science",
+      "strategy": "physics",
+      "languages": ["si", "en", "ta"],
+      "enabled": true,
+      "aliases": ["physics", "bhouthika", "භෞතික", "பௌதிகவியல்", "இயற்பியல்"],
+      "prompt": "",
+      "units": [
+        {"id": "measurement", "name": "Measurements and experimental physics", "keywords": ["measurement", "unit", "dimension", "error", "uncertainty", "vernier", "micrometer", "significant figure", "experiment", "practical"]},
+        {"id": "mechanics", "name": "Mechanics", "keywords": ["force", "newton", "momentum", "velocity", "acceleration", "kinematics", "projectile", "work", "energy", "power", "torque", "circular motion", "gravitation", "fluid", "pressure", "elasticity", "young's modulus", "speed", "displacement"]},
+        {"id": "waves", "name": "Oscillations and waves", "keywords": ["wave", "oscillation", "shm", "frequency", "wavelength", "sound", "interference", "diffraction", "resonance", "doppler", "standing wave", "light", "optics", "lens", "refraction"]},
+        {"id": "thermal", "name": "Thermal physics", "keywords": ["heat", "temperature", "thermal", "specific heat", "latent heat", "gas law", "kinetic theory", "thermodynamics", "expansion", "humidity"]},
+        {"id": "electricity", "name": "Electricity (current and electrostatics)", "keywords": ["current", "voltage", "resistance", "ohm", "circuit", "kirchhoff", "potentiometer", "wheatstone", "capacitor", "electric field", "charge", "coulomb", "potential difference"]},
+        {"id": "magnetism", "name": "Magnetism and electromagnetism", "keywords": ["magnetic", "magnet", "flux", "induction", "faraday", "lenz", "solenoid", "transformer", "tesla"]},
+        {"id": "electronics", "name": "Electronics", "keywords": ["diode", "transistor", "logic gate", "semiconductor", "amplifier", "op-amp", "rectifier", "p-n junction"]},
+        {"id": "modern-physics", "name": "Modern physics", "keywords": ["photoelectric", "photon", "quantum", "radioactivity", "half-life", "nucleus", "x-ray", "de broglie", "atomic spectra", "relativity"]}
+      ]
+    },
+    {
+      "id": "chemistry",
+      "level": "AL",
+      "name": "Chemistry",
+      "group": "science",
+      "strategy": "chemistry",
+      "languages": ["si", "en", "ta"],
+      "enabled": true,
+      "aliases": ["chemistry", "rasayana", "රසායන", "இரசாயனவியல்", "வேதியியல்"],
+      "prompt": "",
+      "units": [
+        {"id": "atomic-structure", "name": "Atomic structure", "keywords": ["atomic structure", "electron configuration", "orbital", "quantum number", "isotope", "ionisation energy", "ionization energy", "periodic table"]},
+        {"id": "bonding", "name": "Chemical bonding", "keywords": ["bond", "bonding", "covalent", "ionic", "vsepr", "hybridisation", "hybridization", "shape of molecule", "intermolecular", "lewis structure", "electronegativity"]},
+        {"id": "energetics", "name": "Chemical energetics", "keywords": ["enthalpy", "hess", "energetics", "exothermic", "endothermic", "bond energy", "lattice energy", "born-haber", "entropy", "gibbs"]},
+        {"id": "kinetics", "name": "Chemical kinetics", "keywords": ["rate of reaction", "kinetics", "rate constant", "order of reaction", "activation energy", "catalyst", "rate law"]},
+        {"id": "equilibrium", "name": "Chemical equilibrium", "keywords": ["equilibrium", "le chatelier", "kc", "kp", "solubility product", "ksp", "dynamic equilibrium"]},
+        {"id": "acids-bases", "name": "Acids, bases and ionic equilibria", "keywords": ["acid", "base", "ph", "buffer", "titration", "indicator", "pka", "hydrolysis", "neutralisation"]},
+        {"id": "electrochemistry", "name": "Electrochemistry", "keywords": ["electrochemistry", "electrolysis", "electrode potential", "cell potential", "galvanic", "redox", "faraday constant", "electrochemical cell"]},
+        {"id": "organic", "name": "Organic chemistry", "keywords": ["organic", "alkane", "alkene", "alkyne", "alcohol", "aldehyde", "ketone", "carboxylic", "ester", "amine", "benzene", "isomer", "mechanism", "nucleophilic", "electrophilic", "polymer", "iupac"]},
+        {"id": "inorganic", "name": "Inorganic chemistry", "keywords": ["inorganic", "s-block", "p-block", "d-block", "transition metal", "halogen", "group 1", "group 2", "complex ion", "oxide", "nitrogen compounds", "sulfur"]},
+        {"id": "analytical", "name": "Analytical chemistry", "keywords": ["analytical", "qualitative analysis", "quantitative analysis", "mole", "stoichiometry", "gravimetric", "volumetric", "chromatography", "spectroscopy", "concentration"]}
+      ]
+    },
+    {
+      "id": "biology",
+      "level": "AL",
+      "name": "Biology",
+      "group": "science",
+      "strategy": "biology",
+      "languages": ["si", "en", "ta"],
+      "enabled": true,
+      "aliases": ["biology", "bio", "jeewa vidyawa", "ජීව විද්‍යාව", "உயிரியல்"],
+      "prompt": "",
+      "units": [
+        {"id": "bio-cell", "name": "Chemical and cellular basis of life", "keywords": ["cell", "organelle", "biomolecule", "carbohydrate", "protein", "lipid", "enzyme", "cell membrane", "mitosis", "meiosis", "cell cycle", "nucleic acid"]},
+        {"id": "bio-evolution", "name": "Evolution and diversity of organisms", "keywords": ["evolution", "classification", "taxonomy", "kingdom", "phylum", "species", "binomial", "natural selection", "diversity", "plantae", "animalia"]},
+        {"id": "bio-plant", "name": "Plant form and function", "keywords": ["photosynthesis", "transpiration", "xylem", "phloem", "stomata", "plant hormone", "auxin", "germination", "plant nutrition", "translocation", "pollination"]},
+        {"id": "bio-animal", "name": "Animal form and function", "keywords": ["digestion", "respiration", "circulation", "heart", "blood", "nervous system", "neuron", "hormone", "endocrine", "excretion", "kidney", "immunity", "homeostasis", "muscle", "skeleton"]},
+        {"id": "bio-genetics", "name": "Genetics", "keywords": ["genetics", "mendel", "inheritance", "allele", "dominant", "recessive", "genotype", "phenotype", "monohybrid", "dihybrid", "linkage", "sex linked", "pedigree"]},
+        {"id": "bio-molecular", "name": "Molecular biology and recombinant DNA", "keywords": ["dna", "rna", "replication", "transcription", "translation", "protein synthesis", "genetic code", "recombinant", "pcr", "gene cloning", "plasmid", "restriction enzyme", "biotechnology"]},
+        {"id": "bio-environment", "name": "Environmental biology", "keywords": ["ecosystem", "ecology", "food chain", "food web", "biome", "pollution", "conservation", "biodiversity", "population ecology", "nutrient cycle"]},
+        {"id": "bio-microbiology", "name": "Microbiology", "keywords": ["microorganism", "bacteria", "virus", "fungi", "microbe", "fermentation", "pathogen", "antibiotic", "culture medium"]},
+        {"id": "bio-applied", "name": "Applied biology", "keywords": ["agriculture", "aquaculture", "tissue culture", "food preservation", "plant breeding", "animal husbandry"]}
+      ]
+    },
+    {
+      "id": "al-ict",
+      "level": "AL",
+      "name": "ICT (A/L)",
+      "group": "ict",
+      "strategy": "ict",
+      "languages": ["si", "en", "ta"],
+      "enabled": true,
+      "aliases": ["ict", "a/l ict", "information and communication technology", "information technology", "computer science", "තොරතුරු තාක්ෂණය", "தகவல் தொடர்பாடல் தொழில்நுட்பம்"],
+      "prompt": "A/L depth. For code, give correct, runnable code (Python unless the student uses another language) and explain it line by line.",
+      "units": [
+        {"id": "al-ict-concepts", "name": "Concepts of ICT and computer architecture", "keywords": ["computer architecture", "cpu", "register", "bus", "memory hierarchy", "cache", "fetch execute", "von neumann", "hardware"]},
+        {"id": "al-ict-data", "name": "Data representation and logic", "keywords": ["binary", "hexadecimal", "octal", "two's complement", "floating point", "ascii", "unicode", "boolean", "logic gate", "truth table", "karnaugh", "k-map"]},
+        {"id": "al-ict-os", "name": "Operating systems", "keywords": ["operating system", "process", "scheduling", "deadlock", "virtual memory", "paging", "file system", "thread"]},
+        {"id": "al-ict-networks", "name": "Data communication and networking", "keywords": ["network", "osi", "tcp/ip", "protocol", "ip address", "subnet", "router", "switch", "lan", "wan", "bandwidth", "modulation"]},
+        {"id": "al-ict-systems", "name": "Systems analysis and design", "keywords": ["sdlc", "system analysis", "system design", "data flow diagram", "dfd", "feasibility", "waterfall", "agile", "requirement"]},
+        {"id": "al-ict-database", "name": "Databases", "keywords": ["database", "er diagram", "entity", "relationship", "normalisation", "normalization", "sql", "primary key", "foreign key", "query", "relational"]},
+        {"id": "al-ict-programming", "name": "Programming and algorithms", "keywords": ["python", "algorithm", "pseudocode", "flowchart", "loop", "function", "array", "list", "recursion", "sorting", "searching", "program", "code"]},
+        {"id": "al-ict-web", "name": "Web development and e-commerce", "keywords": ["html", "css", "php", "javascript", "website", "web page", "e-commerce", "internet of things", "iot"]}
+      ]
+    },
+    {
+      "id": "geography",
+      "level": "AL",
+      "name": "Geography",
+      "group": "humanities",
+      "strategy": "geography",
+      "languages": ["si", "en", "ta"],
+      "enabled": true,
+      "aliases": ["geography", "a/l geography", "භූගෝල විද්‍යාව", "bhugola", "புவியியல்"],
+      "prompt": "",
+      "units": [
+        {"id": "geo-climatology", "name": "Climatology", "keywords": ["climate", "climatology", "monsoon", "rainfall", "atmosphere", "pressure belt", "wind", "cyclone", "inter-monsoon", "convectional", "orographic", "temperature", "humidity", "itcz", "jet stream", "el nino"]},
+        {"id": "geo-geomorphology", "name": "Geomorphology", "keywords": ["landform", "geomorphology", "weathering", "erosion", "deposition", "plate tectonics", "fold", "fault", "volcano", "earthquake", "river", "coastal", "karst", "glacier", "rock"]},
+        {"id": "geo-hydrology", "name": "Hydrology and oceanography", "keywords": ["water cycle", "hydrological", "groundwater", "ocean current", "tide", "drainage basin", "oceanography", "watershed"]},
+        {"id": "geo-biogeography", "name": "Biogeography and soils", "keywords": ["soil", "vegetation", "biome", "biogeography", "soil profile", "laterite"]},
+        {"id": "geo-population", "name": "Population and settlement", "keywords": ["population", "census", "birth rate", "death rate", "migration", "demographic transition", "settlement", "urbanisation", "urbanization", "population pyramid"]},
+        {"id": "geo-economic", "name": "Agriculture, industry and economic geography", "keywords": ["agriculture", "paddy", "plantation", "tea", "rubber", "coconut", "industry", "industrial location", "energy", "trade", "tourism", "fisheries", "transport"]},
+        {"id": "geo-environment", "name": "Environmental geography and hazards", "keywords": ["disaster", "hazard", "landslide", "flood", "drought", "tsunami", "climate change", "global warming", "deforestation", "environmental"]},
+        {"id": "geo-sri-lanka", "name": "Geography of Sri Lanka", "keywords": ["sri lanka", "wet zone", "dry zone", "intermediate zone", "physiographic", "central highlands", "peneplain", "mahaweli", "climatic zone", "agro-ecological"]},
+        {"id": "geo-practical", "name": "Maps and practical geography", "keywords": ["map", "scale", "contour", "grid reference", "topographic", "gis", "remote sensing", "gps", "cross section", "map projection", "aerial photograph"]}
+      ]
+    },
+    {
+      "id": "history",
+      "level": "AL",
+      "name": "History",
+      "group": "humanities",
+      "strategy": "history",
+      "languages": ["si", "en", "ta"],
+      "enabled": true,
+      "aliases": ["history", "a/l history", "ඉතිහාසය", "ithihasaya", "வரலாறு"],
+      "prompt": "",
+      "units": [
+        {"id": "hist-sl-ancient", "name": "Sri Lanka: ancient period", "keywords": ["anuradhapura", "polonnaruwa", "dutugemunu", "parakramabahu", "vijaya", "devanampiyatissa", "mahavamsa", "irrigation", "tank", "stupa", "hydraulic civilisation", "chola"]},
+        {"id": "hist-sl-medieval", "name": "Sri Lanka: Dambadeniya to Kandy", "keywords": ["dambadeniya", "kotte", "sitawaka", "kandy", "kandyan", "rajasinghe", "jaffna kingdom", "gampola", "kurunegala", "yapahuwa"]},
+        {"id": "hist-sl-colonial", "name": "Sri Lanka: colonial period", "keywords": ["portuguese", "dutch", "british", "colonial", "colebrooke", "cameron", "1815", "kandyan convention", "plantation", "1818", "1848"]},
+        {"id": "hist-sl-modern", "name": "Sri Lanka: national movement and independence", "keywords": ["independence", "1948", "national movement", "donoughmore", "soulbury", "universal franchise", "constitutional reform", "senanayake"]},
+        {"id": "hist-india", "name": "History of India", "keywords": ["india", "indus valley", "mauryan", "ashoka", "gupta", "mughal", "akbar", "british india", "gandhi", "indian national congress", "partition"]},
+        {"id": "hist-europe", "name": "History of Europe", "keywords": ["renaissance", "reformation", "french revolution", "napoleon", "industrial revolution", "unification of italy", "unification of germany", "enlightenment"]},
+        {"id": "hist-world", "name": "Modern world history", "keywords": ["world war", "cold war", "united nations", "league of nations", "russian revolution", "decolonisation", "fascism", "imperialism"]}
+      ]
+    },
+    {
+      "id": "economics",
+      "level": "AL",
+      "name": "Economics",
+      "group": "humanities",
+      "strategy": "social_science",
+      "languages": ["si", "en", "ta"],
+      "enabled": true,
+      "aliases": ["economics", "econ", "ආර්ථික විද්‍යාව", "arthika vidyawa", "பொருளியல்"],
+      "prompt": "Use economic models explained in words and, where helpful, a simple described diagram (axes, curves, shift). Any current figure (inflation, GDP, debt) must name its source and year.",
+      "units": [
+        {"id": "econ-micro", "name": "Microeconomics", "keywords": ["demand", "supply", "elasticity", "price", "consumer", "utility", "producer", "cost", "revenue", "market structure", "monopoly", "perfect competition", "oligopoly", "market equilibrium"]},
+        {"id": "econ-macro", "name": "Macroeconomics", "keywords": ["inflation rate", "national income", "gdp", "gnp", "inflation", "unemployment", "fiscal policy", "monetary policy", "central bank", "money supply", "interest rate", "aggregate demand", "multiplier", "budget deficit"]},
+        {"id": "econ-international", "name": "International economics", "keywords": ["international trade", "comparative advantage", "exchange rate", "balance of payments", "tariff", "import", "export", "devaluation", "terms of trade"]},
+        {"id": "econ-development", "name": "Development economics", "keywords": ["economic growth", "economic development", "poverty", "hdi", "human development", "income distribution", "gini", "sustainable development"]},
+        {"id": "econ-sri-lanka", "name": "Sri Lankan economy", "keywords": ["sri lankan economy", "debt", "imf", "economic crisis", "open economy", "1977", "remittances", "foreign reserves"]}
+      ]
+    },
+    {
+      "id": "political-science",
+      "level": "AL",
+      "name": "Political Science",
+      "group": "humanities",
+      "strategy": "social_science",
+      "languages": ["si", "en", "ta"],
+      "enabled": true,
+      "aliases": ["political science", "politics", "civics", "deshapalana vidyawa", "දේශපාලන විද්‍යාව", "அரசறிவியல்"],
+      "prompt": "Distinguish clearly between what a constitution or law says (fact) and how commentators interpret it (opinion). Never state a current office-holder or recent amendment unless a source confirms it.",
+      "units": [
+        {"id": "pol-theory", "name": "Political theory", "keywords": ["state", "sovereignty", "democracy", "rights", "power", "authority", "legitimacy", "liberty", "equality", "nationalism", "ideology"]},
+        {"id": "pol-government", "name": "Government and constitutions", "keywords": ["constitution", "parliament", "executive", "legislature", "judiciary", "separation of powers", "federal", "unitary", "presidential", "parliamentary", "amendment", "devolution", "provincial council", "election", "electoral system"]},
+        {"id": "pol-international", "name": "International relations", "keywords": ["international relations", "foreign policy", "united nations", "non-aligned", "diplomacy", "regional organisation", "saarc", "globalisation"]},
+        {"id": "pol-public-admin", "name": "Public administration and local government", "keywords": ["public administration", "bureaucracy", "local government", "public service", "municipal council", "pradeshiya sabha"]}
+      ]
+    },
+    {
+      "id": "logic",
+      "level": "AL",
+      "name": "Logic and Scientific Method",
+      "group": "humanities",
+      "strategy": "logic",
+      "languages": ["si", "en", "ta"],
+      "enabled": true,
+      "aliases": ["logic", "logic and scientific method", "tarka shastra", "තර්ක ශාස්ත්‍රය", "அளவையியல்"],
+      "prompt": "",
+      "units": [
+        {"id": "logic-deductive", "name": "Deductive logic", "keywords": ["syllogism", "premise", "conclusion", "validity", "valid", "invalid", "fallacy", "argument", "deduction", "categorical proposition", "square of opposition"]},
+        {"id": "logic-symbolic", "name": "Symbolic (propositional) logic", "keywords": ["truth table", "proposition", "connective", "tautology", "contradiction", "conjunction", "disjunction", "implication", "biconditional", "symbolic logic"]},
+        {"id": "logic-scientific", "name": "Induction and scientific method", "keywords": ["induction", "inductive", "hypothesis", "scientific method", "mill's methods", "observation", "experiment", "causation", "analogy"]}
+      ]
+    },
+    {
+      "id": "al-sinhala",
+      "level": "AL",
+      "name": "Sinhala (A/L)",
+      "group": "language",
+      "strategy": "language",
+      "languages": ["si", "en", "ta"],
+      "enabled": true,
+      "aliases": ["a/l sinhala", "sinhala", "sinhala language", "sinhala literature", "සිංහල", "சிங்களம்"],
+      "prompt": "",
+      "units": [
+        {"id": "al-si-grammar", "name": "Grammar (ව්‍යාකරණ)", "keywords": ["ව්‍යාකරණ", "සන්ධි", "සමාස", "විභක්ති", "කාරක", "vyakarana", "sandhi", "samasa", "grammar"]},
+        {"id": "al-si-writing", "name": "Writing and composition", "keywords": ["රචනා", "රචනාව", "ලිපිය", "නිබන්ධ", "rachana", "essay", "composition"]},
+        {"id": "al-si-literature", "name": "Literature (සාහිත්‍යය)", "keywords": ["සාහිත්‍ය", "කවිය", "කාව්", "නවකතා", "කෙටිකතා", "literature", "poem", "novel"]}
+      ]
+    },
+    {
+      "id": "al-english",
+      "level": "AL",
+      "name": "English (A/L)",
+      "group": "language",
+      "strategy": "language",
+      "languages": ["si", "en", "ta"],
+      "enabled": true,
+      "aliases": ["a/l english", "english", "general english", "english literature", "english language", "ඉංග්‍රීසි", "ஆங்கிலம்"],
+      "prompt": "",
+      "units": [
+        {"id": "al-en-grammar", "name": "Grammar and usage", "keywords": ["grammar", "tense", "tenses", "preposition", "passive voice", "reported speech", "conditional", "subject verb agreement", "punctuation", "sentence correction"]},
+        {"id": "al-en-writing", "name": "Writing", "keywords": ["essay", "letter", "report", "article", "speech", "composition", "argumentative", "paragraph"]},
+        {"id": "al-en-literature", "name": "Literature", "keywords": ["poem", "poetry", "novel", "drama", "short story", "character", "theme", "literary device", "metaphor", "simile"]}
+      ]
+    },
+    {
+      "id": "al-tamil",
+      "level": "AL",
+      "name": "Tamil (A/L)",
+      "group": "language",
+      "strategy": "language",
+      "languages": ["si", "en", "ta"],
+      "enabled": true,
+      "aliases": ["tamil", "tamil language", "tamil literature", "தமிழ்", "දෙමළ"],
+      "prompt": "",
+      "units": [
+        {"id": "al-ta-grammar", "name": "Grammar (இலக்கணம்)", "keywords": ["இலக்கணம்", "grammar", "புணர்ச்சி", "வேற்றுமை"]},
+        {"id": "al-ta-writing", "name": "Writing (கட்டுரை)", "keywords": ["கட்டுரை", "கடிதம்", "essay", "letter"]},
+        {"id": "al-ta-literature", "name": "Literature (இலக்கியம்)", "keywords": ["இலக்கியம்", "கவிதை", "literature", "poem", "novel"]}
+      ]
+    },
+    {
+      "id": "buddhism",
+      "level": "AL",
+      "name": "Buddhism",
+      "group": "other",
+      "strategy": "religion",
+      "languages": ["si", "en", "ta"],
+      "enabled": true,
+      "aliases": ["buddhism", "buddhist civilization", "buddhist civilisation", "bauddha dharmaya", "බුද්ධ ධර්මය", "බෞද්ධ", "பௌத்தம்"],
+      "prompt": "Academic, respectful and neutral. Use Pali terms with their meaning. Quote or attribute a sutta only when you are sure of the source.",
+      "units": [
+        {"id": "bud-life", "name": "Life of the Buddha", "keywords": ["siddhartha", "life of the buddha", "enlightenment", "bodhi", "great renunciation", "parinibbana", "first sermon", "dhammacakkappavattana"]},
+        {"id": "bud-teachings", "name": "Core teachings", "keywords": ["four noble truths", "eightfold path", "dependent origination", "paticcasamuppada", "three characteristics", "anicca", "dukkha", "anatta", "karma", "kamma", "nibbana", "nirvana", "rebirth", "meditation"]},
+        {"id": "bud-texts", "name": "Tipitaka and texts", "keywords": ["tipitaka", "sutta", "vinaya", "abhidhamma", "dhammapada", "jataka", "pali canon"]},
+        {"id": "bud-sri-lanka", "name": "Buddhism in Sri Lanka", "keywords": ["arahat mahinda", "mahinda", "sanghamitta", "sri maha bodhi", "tooth relic", "dalada", "theravada", "mahavihara", "abhayagiri"]}
+      ]
+    },
+    {
+      "id": "ol-mathematics",
+      "level": "OL",
+      "name": "Mathematics (O/L)",
+      "group": "mathematics",
+      "strategy": "mathematics",
+      "languages": ["si", "en", "ta"],
+      "enabled": true,
+      "aliases": ["mathematics", "maths", "math", "o/l maths", "o/l mathematics", "ganithaya", "ගණිතය", "கணிதம்"],
+      "prompt": "Use O/L methods only (no calculus). O/L marking rewards method: formula, substitution, working, answer with units.",
+      "units": [
+        {"id": "ol-number", "name": "Numbers, indices and logarithms", "keywords": ["indices", "index", "logarithm", "log", "surd", "standard form", "significant figures", "number", "fraction", "decimal"]},
+        {"id": "ol-ratio-percentage", "name": "Ratios, percentages and financial mathematics", "keywords": ["ratio", "proportion", "percentage", "percent", "interest", "compound interest", "profit", "loss", "discount", "rates", "taxes", "commission"]},
+        {"id": "ol-algebra", "name": "Algebra", "keywords": ["algebra", "expression", "factorise", "factorisation", "expand", "simplify", "substitution", "formula", "change the subject", "algebraic fraction"]},
+        {"id": "ol-equations", "name": "Equations and inequalities", "keywords": ["equation", "simultaneous", "linear equation", "quadratic equation", "inequality", "inequalities", "solve for", "root", "discriminant"], "patterns": ["[a-z]\\s*(?:\\^\\s*2|²)"]},
+        {"id": "ol-sets", "name": "Sets and Venn diagrams", "keywords": ["set", "sets", "venn", "union", "intersection", "subset", "universal set", "complement"]},
+        {"id": "ol-geometry", "name": "Geometry", "keywords": ["angle", "triangle", "parallel lines", "polygon", "congruent", "similar triangles", "circle theorem", "chord", "tangent", "pythagoras", "construction", "locus", "bisector"]},
+        {"id": "ol-mensuration", "name": "Mensuration (area and volume)", "keywords": ["area", "perimeter", "volume", "surface area", "cylinder", "cone", "sphere", "prism", "sector", "arc length", "circumference"]},
+        {"id": "ol-trigonometry", "name": "Trigonometry", "keywords": ["sin", "cos", "tan", "trigonometry", "trigonometric", "angle of elevation", "angle of depression", "bearing", "right-angled triangle"]},
+        {"id": "ol-graphs", "name": "Graphs and functions", "keywords": ["graph", "gradient", "straight line", "coordinate", "y = mx", "quadratic graph", "function", "intercept", "plot"]},
+        {"id": "ol-statistics", "name": "Statistics", "keywords": ["mean", "median", "mode", "range", "frequency table", "histogram", "pie chart", "cumulative frequency", "quartile", "ogive", "statistics"]},
+        {"id": "ol-probability", "name": "Probability", "keywords": ["probability", "tree diagram", "sample space", "event", "outcome", "chance", "likelihood"]},
+        {"id": "ol-sequences", "name": "Sequences and series", "keywords": ["sequence", "arithmetic progression", "geometric progression", "nth term", "common difference", "common ratio", "series"]}
+      ]
+    },
+    {
+      "id": "ol-science",
+      "level": "OL",
+      "name": "Science (O/L)",
+      "group": "science",
+      "strategy": "science",
+      "languages": ["si", "en", "ta"],
+      "enabled": true,
+      "aliases": ["science", "o/l science", "general science", "vidyawa", "විද්‍යාව", "விஞ்ஞானம்"],
+      "prompt": "Keep to Grade 10–11 depth. Use the standard textbook wording for definitions and connect ideas to everyday Sri Lankan examples.",
+      "units": [
+        {"id": "ol-motion-forces", "name": "Motion and forces", "keywords": ["motion", "speed", "velocity", "acceleration", "force", "newton", "momentum", "friction", "gravity", "weight", "mass", "distance-time", "velocity-time"], "strategy": "physics"},
+        {"id": "ol-work-energy", "name": "Work, energy and power", "keywords": ["work", "energy", "power", "kinetic energy", "potential energy", "conservation of energy", "efficiency", "machine", "lever", "pulley"], "strategy": "physics"},
+        {"id": "ol-pressure", "name": "Pressure and fluids", "keywords": ["pressure", "density", "upthrust", "archimedes", "floating", "hydraulic", "atmospheric pressure", "barometer"], "strategy": "physics"},
+        {"id": "ol-heat", "name": "Heat and temperature", "keywords": ["heat", "temperature", "thermometer", "conduction", "convection", "radiation", "specific heat", "latent heat", "expansion"], "strategy": "physics"},
+        {"id": "ol-light-waves", "name": "Light, waves and sound", "keywords": ["light", "reflection", "refraction", "lens", "mirror", "wave", "sound", "frequency", "wavelength", "echo", "dispersion", "spectrum"], "strategy": "physics"},
+        {"id": "ol-electricity", "name": "Electricity and magnetism", "keywords": ["current", "voltage", "resistance", "ohm", "circuit", "series", "parallel", "electric", "magnet", "magnetic", "electromagnet", "fuse", "household wiring"], "strategy": "physics"},
+        {"id": "ol-matter-atoms", "name": "Matter, atoms and the periodic table", "keywords": ["atom", "molecule", "element", "compound", "mixture", "periodic table", "proton", "neutron", "electron", "isotope", "valency", "states of matter"], "strategy": "chemistry"},
+        {"id": "ol-chem-reactions", "name": "Chemical reactions, acids, bases and salts", "keywords": ["acid", "base", "alkali", "salt", "ph", "indicator", "neutralisation", "reaction", "rate of reaction", "mole", "chemical equation", "oxidation", "reduction", "rusting"], "strategy": "chemistry"},
+        {"id": "ol-carbon-metals", "name": "Carbon compounds and metals", "keywords": ["organic", "hydrocarbon", "alkane", "alkene", "alcohol", "metals", "reactivity series", "extraction of metals", "alloy", "corrosion", "polymer"], "strategy": "chemistry"},
+        {"id": "ol-cells-organisms", "name": "Cells, nutrition and transport", "keywords": ["cell", "tissue", "organ", "nutrition", "digestion", "enzyme", "photosynthesis", "respiration", "blood", "heart", "circulation", "transport in plants", "diffusion", "osmosis"], "strategy": "biology"},
+        {"id": "ol-reproduction-genetics", "name": "Reproduction, genetics and evolution", "keywords": ["reproduction", "gene", "dna", "chromosome", "heredity", "inheritance", "mutation", "evolution", "natural selection", "mitosis", "meiosis"], "strategy": "biology"},
+        {"id": "ol-ecology", "name": "Ecology and the environment", "keywords": ["ecosystem", "food chain", "food web", "habitat", "population", "pollution", "conservation", "biodiversity", "environment", "nitrogen cycle", "carbon cycle"], "strategy": "biology"}
+      ]
+    },
+    {
+      "id": "ol-ict",
+      "level": "OL",
+      "name": "ICT (O/L)",
+      "group": "ict",
+      "strategy": "ict",
+      "languages": ["si", "en", "ta"],
+      "enabled": true,
+      "aliases": ["ict", "information and communication technology", "information technology", "o/l ict", "computer", "තොරතුරු තාක්ෂණය", "தகவல் தொடர்பாடல் தொழில்நுட்பம்"],
+      "prompt": "O/L depth: precise terms, binary arithmetic shown digit by digit, trace tables for algorithms.",
+      "units": [
+        {"id": "ol-ict-hardware", "name": "Computer hardware and software", "keywords": ["hardware", "software", "cpu", "ram", "operating system", "input device", "output device", "storage", "motherboard"]},
+        {"id": "ol-ict-numbers", "name": "Number systems and logic", "keywords": ["binary", "hexadecimal", "octal", "number system", "logic gate", "boolean", "and gate", "or gate", "not gate", "truth table"]},
+        {"id": "ol-ict-programming", "name": "Programming and algorithms", "keywords": ["algorithm", "flowchart", "pseudocode", "programming", "loop", "variable", "python", "pascal", "debugging"]},
+        {"id": "ol-ict-database", "name": "Databases and spreadsheets", "keywords": ["database", "table", "primary key", "query", "spreadsheet", "excel", "formula", "cell reference", "word processing"]},
+        {"id": "ol-ict-networks", "name": "Networks and the internet", "keywords": ["network", "internet", "lan", "wan", "protocol", "ip address", "email", "browser", "website", "cyber security", "ethics"]}
+      ]
+    },
+    {
+      "id": "ol-english",
+      "level": "OL",
+      "name": "English (O/L)",
+      "group": "language",
+      "strategy": "language",
+      "languages": ["si", "en", "ta"],
+      "enabled": true,
+      "aliases": ["english", "o/l english", "english language", "ඉංග්‍රීසි", "ஆங்கிலம்"],
+      "prompt": "",
+      "units": [
+        {"id": "ol-en-grammar", "name": "Grammar and usage", "keywords": ["grammar", "tense", "tenses", "preposition", "article", "passive voice", "active voice", "reported speech", "direct speech", "conditional", "subject verb agreement", "punctuation"]},
+        {"id": "ol-en-writing", "name": "Writing (essays, letters, notices)", "keywords": ["essay", "letter", "formal letter", "informal letter", "notice", "speech", "report", "dialogue", "paragraph", "composition"]},
+        {"id": "ol-en-comprehension", "name": "Reading and comprehension", "keywords": ["comprehension", "passage", "summary", "summarise", "vocabulary", "synonym", "antonym"]},
+        {"id": "ol-en-literature", "name": "Literature", "keywords": ["poem", "poetry", "short story", "novel", "drama", "character", "theme", "literature"]}
+      ]
+    },
+    {
+      "id": "ol-sinhala",
+      "level": "OL",
+      "name": "Sinhala Language and Literature (O/L)",
+      "group": "language",
+      "strategy": "language",
+      "languages": ["si", "en", "ta"],
+      "enabled": true,
+      "aliases": ["sinhala language", "sinhala literature", "o/l sinhala", "සිංහල භාෂාව", "සිංහල සාහිත්‍යය", "சிங்களம்"],
+      "prompt": "",
+      "units": [
+        {"id": "ol-si-grammar", "name": "Grammar (ව්‍යාකරණ)", "keywords": ["ව්‍යාකරණ", "සන්ධි", "සමාස", "විභක්ති", "කාරක", "vyakarana", "sandhi", "samasa"]},
+        {"id": "ol-si-writing", "name": "Writing (රචනා, ලිපි)", "keywords": ["රචනා", "රචනාව", "ලිපිය", "ලිපි", "නිබන්ධ", "rachana", "essay", "letter"]},
+        {"id": "ol-si-literature", "name": "Literature (සාහිත්‍යය)", "keywords": ["සාහිත්‍ය", "කවිය", "කාව්", "නවකතා", "කෙටිකතා", "nisadas", "kawiya", "poem"]}
+      ]
+    },
+    {
+      "id": "ol-history",
+      "level": "OL",
+      "name": "History (O/L)",
+      "group": "humanities",
+      "strategy": "history",
+      "languages": ["si", "en", "ta"],
+      "enabled": true,
+      "aliases": ["history", "o/l history", "ඉතිහාසය", "வரலாறு"],
+      "prompt": "",
+      "units": [
+        {"id": "ol-hist-ancient", "name": "Ancient Sri Lanka (Anuradhapura, Polonnaruwa)", "keywords": ["anuradhapura", "polonnaruwa", "dutugemunu", "parakramabahu", "vijaya", "devanampiyatissa", "mahavamsa", "irrigation", "tank", "wewa", "stupa", "dagoba", "hydraulic civilisation"]},
+        {"id": "ol-hist-kingdoms", "name": "Later kingdoms (Dambadeniya to Kandy)", "keywords": ["dambadeniya", "kotte", "sitawaka", "kandy", "kandyan", "rajasinghe", "wimaladharmasuriya", "jaffna kingdom", "gampola", "kurunegala"]},
+        {"id": "ol-hist-colonial", "name": "Colonial period (Portuguese, Dutch, British)", "keywords": ["portuguese", "dutch", "british", "colonial", "colebrooke", "cameron", "1815", "kandyan convention", "plantation", "coffee", "1818 rebellion", "1848"]},
+        {"id": "ol-hist-modern", "name": "National movement and independence", "keywords": ["independence", "1948", "national movement", "temperance", "donoughmore", "soulbury", "universal franchise", "d s senanayake", "anagarika dharmapala"]},
+        {"id": "ol-hist-world", "name": "World history", "keywords": ["industrial revolution", "renaissance", "world war", "french revolution", "american revolution", "united nations", "cold war"]}
+      ]
+    },
+    {
+      "id": "ol-geography",
+      "level": "OL",
+      "name": "Geography (O/L)",
+      "group": "humanities",
+      "strategy": "geography",
+      "languages": ["si", "en", "ta"],
+      "enabled": true,
+      "aliases": ["geography", "o/l geography", "භූගෝල විද්‍යාව", "புவியியல்"],
+      "prompt": "",
+      "units": [
+        {"id": "ol-geo-maps", "name": "Map work", "keywords": ["map", "scale", "grid reference", "contour", "topographic", "compass", "direction", "latitude", "longitude", "map reading"]},
+        {"id": "ol-geo-climate", "name": "Climate and weather of Sri Lanka", "keywords": ["climate", "weather", "monsoon", "rainfall", "temperature", "wet zone", "dry zone", "intermediate zone", "convectional rain", "cyclone", "inter-monsoon"]},
+        {"id": "ol-geo-physical", "name": "Physical geography", "keywords": ["landform", "river", "mountain", "plateau", "coast", "soil", "weathering", "erosion", "volcano", "earthquake", "plate"]},
+        {"id": "ol-geo-resources", "name": "Resources, agriculture and industry", "keywords": ["agriculture", "paddy", "tea", "rubber", "coconut", "fishing", "industry", "minerals", "tourism", "forest", "energy", "hydropower"]},
+        {"id": "ol-geo-world", "name": "World regions and population", "keywords": ["population", "continent", "settlement", "urbanisation", "urbanization", "migration"]}
+      ]
+    },
+    {
+      "id": "ol-commerce",
+      "level": "OL",
+      "name": "Business and Accounting Studies (O/L)",
+      "group": "humanities",
+      "strategy": "social_science",
+      "languages": ["si", "en", "ta"],
+      "enabled": true,
+      "aliases": ["commerce", "business studies", "accounting", "business and accounting", "o/l commerce", "வணிகக் கல்வி"],
+      "prompt": "",
+      "units": [
+        {"id": "ol-com-business", "name": "Business environment and organisations", "keywords": ["business", "entrepreneur", "sole trader", "partnership", "company", "cooperative", "marketing", "production", "trade"]},
+        {"id": "ol-com-accounting", "name": "Accounting", "keywords": ["accounting", "ledger", "journal", "trial balance", "income statement", "balance sheet", "double entry", "debit", "credit", "cash book", "depreciation"]}
+      ]
+    },
+    {
+      "id": "ol-health",
+      "level": "OL",
+      "name": "Health and Physical Education (O/L)",
+      "group": "other",
+      "strategy": "general",
+      "languages": ["si", "en", "ta"],
+      "enabled": true,
+      "aliases": ["health", "health and physical education", "o/l health", "சுகாதாரம்"],
+      "prompt": "Health and Physical Education: accurate, age-appropriate, non-judgemental. For any personal medical question, advise seeing a doctor.",
+      "units": []
+    },
+    {
+      "id": "ol-religion",
+      "level": "OL",
+      "name": "Religion (O/L)",
+      "group": "other",
+      "strategy": "religion",
+      "languages": ["si", "en", "ta"],
+      "enabled": true,
+      "aliases": ["buddhism", "religion", "christianity", "catholicism", "islam", "hinduism", "o/l religion"],
+      "prompt": "",
+      "units": [
+        {"id": "ol-rel-buddhism", "name": "Buddhism", "keywords": ["buddhism", "buddha", "dhamma", "sangha", "four noble truths", "eightfold path", "karma", "nibbana", "sila", "jataka", "බුද්ධ"]}
+      ]
+    },
+    {
+      "id": "ol-tamil",
+      "level": "OL",
+      "name": "Tamil Language (O/L)",
+      "group": "language",
+      "strategy": "language",
+      "languages": ["si", "en", "ta"],
+      "enabled": true,
+      "aliases": ["o/l tamil", "tamil", "tamil language", "தமிழ்", "දෙමළ"],
+      "prompt": "",
+      "units": [
+        {"id": "ol-ta-grammar", "name": "Grammar (இலக்கணம்)", "keywords": ["இலக்கணம்", "grammar", "புணர்ச்சி", "வேற்றுமை"]},
+        {"id": "ol-ta-writing", "name": "Writing (கட்டுரை)", "keywords": ["கட்டுரை", "கடிதம்", "essay", "letter"]}
+      ]
+    },
+    {
+      "id": "ol-civics",
+      "level": "OL",
+      "name": "Civic Education (O/L)",
+      "group": "humanities",
+      "strategy": "social_science",
+      "languages": ["si", "en", "ta"],
+      "enabled": true,
+      "aliases": ["civics", "civic education", "o/l civics", "පුරවැසි අධ්‍යාපනය", "குடியியல்"],
+      "prompt": "",
+      "units": [
+        {"id": "ol-civ-democracy", "name": "Democracy and governance", "keywords": ["democracy", "constitution", "parliament", "election", "local government", "provincial council", "rule of law", "fundamental rights"]},
+        {"id": "ol-civ-society", "name": "Society, rights and duties", "keywords": ["human rights", "duties", "citizen", "social harmony", "multicultural", "consumer rights"]}
+      ]
+    },
+    {
+      "id": "study-skills",
+      "level": "ANY",
+      "name": "Study Skills and Exam Preparation",
+      "group": "other",
+      "strategy": "general",
+      "languages": ["si", "en", "ta"],
+      "enabled": true,
+      "aliases": ["study skills", "exam preparation", "study tips", "how to study"],
+      "prompt": "",
+      "units": [
+        {"id": "study-memory", "name": "Memory and revision techniques", "keywords": ["spaced repetition", "active recall", "flashcard", "memorise", "memorize", "revision", "revise", "mind map", "forgetting"]},
+        {"id": "study-time", "name": "Time management and planning", "keywords": ["study plan", "timetable", "time management", "pomodoro", "procrastination", "schedule", "focus", "concentrate", "concentration"]},
+        {"id": "study-exam", "name": "Exam technique", "keywords": ["exam technique", "past paper practice", "time in the exam", "exam stress", "exam anxiety", "mcq technique"]}
+      ]
+    },
+    {
+      "id": "general-knowledge",
+      "level": "ANY",
+      "name": "General Knowledge",
+      "group": "other",
+      "strategy": "general",
+      "languages": ["si", "en", "ta"],
+      "enabled": true,
+      "aliases": ["general knowledge", "gk", "current affairs"],
+      "prompt": "",
+      "units": []
+    }
+  ]
+}

@@ -15,7 +15,7 @@
 //   "demo"  → offline, $0, pattern-based engine (./demo), also the automatic
 //             fallback when the cloud is unreachable.
 // ─────────────────────────────────────────────
-import type { Difficulty, EngineKind, Flashcard, LearningContext, Mode, Quiz, Source, StudyPlan, StudyProfile, Subject } from "../types";
+import type { AnswerMeta, Difficulty, EngineKind, Flashcard, LearningContext, Mode, Quiz, Source, StudyPlan, StudyProfile, Subject } from "../types";
 import { sleep } from "../lib/utils";
 import { detectIntent, type Intent } from "./intent";
 import { demoFlashcards, demoQuiz, demoRespond, detectSubject, type DemoOutput } from "./demo/demoEngine";
@@ -48,7 +48,9 @@ export type EngineEvent =
   | { type: "suggestions"; items: string[] }
   /** OLIS Cloud switched engine mid-answer: keep only the first `to` characters. */
   | { type: "rewind"; to: number }
-  | { type: "notice"; kind: "switching" };
+  | { type: "notice"; kind: "switching" }
+  /** OLIS Cloud: detected subject / topic / confidence. */
+  | { type: "meta"; meta: AnswerMeta };
 
 export interface ResponseRequest {
   input: string;

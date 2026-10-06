@@ -29,7 +29,7 @@ export function parseProfile(v: unknown): StudentProfile | undefined {
   const profile: StudentProfile = {
     stream: line(p.stream, 40) || undefined,
     subjects: list(p.subjects, 6, 40),
-    language: p.language === "si" || p.language === "en" || p.language === "auto" ? p.language : undefined,
+    language: p.language === "si" || p.language === "en" || p.language === "ta" || p.language === "auto" ? p.language : undefined,
     depth: p.depth === "quick" || p.depth === "standard" || p.depth === "deep" ? p.depth : undefined,
     currentTopic: line(p.currentTopic, 80) || undefined,
     weakTopics: list(p.weakTopics, 8, 60),

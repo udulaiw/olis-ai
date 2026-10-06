@@ -15,7 +15,7 @@ import type { Config } from "./config.js";
 import { searchKnowledge, groundingOf, relevantHits, type Grounding } from "./rag.js";
 import { SourceRegistry, runTool, toolDeclarations, type Source } from "./tools.js";
 import { systemPrompt, type LearningContext, type StudentProfile } from "./prompts.js";
-import { classifyRequest } from "./ai/intent.js";
+import { classifyRequest, confidenceOf, type Confidence, type Intent } from "./ai/intent.js";
 import { streamWithFallback } from "./ai/router.js";
 import { newRequestId, aiLog } from "./ai/log.js";
 import { createScriptGuard } from "./lang/unicode.mjs";
@@ -27,7 +27,20 @@ export type AgentEvent =
   | { type: "text"; delta: string }
   /** Drop everything after this many characters of the answer (an engine failed mid-answer). */
   | { type: "rewind"; to: number }
-  | { type: "notice"; kind: "switching" };
+  | { type: "notice"; kind: "switching" }
+  /** What OLIS understood the question to be (shown under the answer). Labels only. */
+  | { type: "meta"; meta: AnswerMeta };
+
+export interface AnswerMeta {
+  subject: string | null;
+  subjectName: string | null;
+  topic: string | null;
+  level: "OL" | "AL" | null;
+  intent: Intent;
+  reply: string;
+  /** From retrieval evidence; null when not applicable (greetings, plans, attached documents). */
+  confidence: Confidence | null;
+}
 
 export interface AgentRequest {
   messages: { role: "user" | "assistant"; content: string }[];
@@ -39,7 +52,6 @@ export interface AgentRequest {
 }
 
 const clip = (s: string, n: number) => (s.length > n ? s.slice(0, n) + "…" : s);
-const TRIVIAL = /^(hi|hello|hey|thanks|thank you|ok|okay|yo|cool|nice|good (morning|night|evening)|ආයුබෝවන්|ස්තූතියි|හායි)\b[\s!.?]*$/i;
 
 function stepLabel(call: ToolCall) {
   const a = call.args;
@@ -89,7 +101,7 @@ export async function* runAgent(cfg: Config, req: AgentRequest, signal?: AbortSi
   //    for follow-ups like "මේක තේරෙන්නෙ නෑ", with the topic of the previous question.
   let kbBlock = "";
   let grounding: Grounding | undefined;
-  if (req.mode !== "summarize" && !TRIVIAL.test(question.trim()) && question.trim().length > 3) {
+  if (req.mode !== "summarize" && cls.requiresRetrieval) {
     const id = `s${++stepN}`;
     yield { type: "step", id, label: "Checking OLIS study notes", status: "running" };
     const found = await searchKnowledge(cfg, cls.retrievalQuery, { k: 4, subject: req.context.subject, signal, level: cls.examLevel }).catch(() => []);
@@ -97,7 +109,7 @@ export async function* runAgent(cfg: Config, req: AgentRequest, signal?: AbortSi
     if (!req.attachment) grounding = groundingOf(found);
     // ...and when the verdict is "none", the incidental matches are not shown either (the model can still call search_knowledge_base itself)
     const hits = grounding === "none" ? [] : relevantHits(found);
-    aiLog({ evt: "ai.retrieval", requestId, route: "agent", grounding: grounding ?? "n/a", hits: hits.length, level: cls.examLevel ?? "unknown", specialist: cls.specialist, reply: cls.reply });
+    aiLog({ evt: "ai.retrieval", requestId, route: "agent", grounding: grounding ?? "n/a", hits: hits.length, level: cls.examLevel ?? "unknown", specialist: cls.specialist, reply: cls.reply, subject: cls.subject ?? "none", intent: cls.intent, difficulty: cls.difficulty });
     const srcs = hits.map((h) =>
       reg.add({
         kind: h.chunk.type === "past_paper" || h.chunk.type === "marking_scheme" ? "paper" : "notes",
@@ -126,6 +138,19 @@ export async function* runAgent(cfg: Config, req: AgentRequest, signal?: AbortSi
     }
   }
 
+  yield {
+    type: "meta",
+    meta: {
+      subject: cls.subject,
+      subjectName: cls.subjectName,
+      topic: cls.topicName,
+      level: cls.examLevel,
+      intent: cls.intent,
+      reply: cls.reply,
+      confidence: req.attachment ? null : confidenceOf(grounding, cls.intent),
+    },
+  };
+
   const buildSystem = (scriptRetry = false) =>
     systemPrompt(req.context, req.mode, {
       tools: true,
@@ -138,6 +163,12 @@ export async function* runAgent(cfg: Config, req: AgentRequest, signal?: AbortSi
       terms: cls.terms,
       followUpHint: cls.followUp?.hint,
       scriptRetry,
+      subjectId: cls.subject,
+      discipline: cls.discipline,
+      intent: cls.intent,
+      difficulty: cls.difficulty,
+      requiresCurrentInfo: cls.requiresCurrentInfo,
+      today: new Date().toISOString().slice(0, 10),
     });
   let system = buildSystem();
   // The script the answer must stay in. Off when the student themselves is working in Hindi/Tamil.

@@ -60,6 +60,17 @@ export function explicitLanguageRequest(text) {
   return hits.sort((a, b) => b.at - a.at)[0].lang;
 }
 
+/**
+ * Remove "in English" / "සිංහලෙන්" / "in Tamil" style requests, so a request about the ANSWER language
+ * isn't read as a question about the Sinhala, English or Tamil language SUBJECT.
+ * @param {string} text
+ */
+export function stripLanguageRequests(text) {
+  let t = cleanSinhala(text);
+  for (const re of [ASK_EN, ASK_SI, ASK_TA]) t = t.replace(new RegExp(re.source, re.flags.includes("g") ? re.flags : re.flags + "g"), " ");
+  return t.replace(/\s+/g, " ").trim();
+}
+
 /** @param {string} text */
 export function singlishWords(text) {
   return (text.toLowerCase().match(/[a-z]+/g) ?? []).map((w) => SINGLISH_FIX[w] ?? w);
@@ -85,9 +96,9 @@ export function detectLanguage(text) {
 /**
  * Decide the reply language.
  *  - an explicit request ("in English", "සිංහලෙන්") always wins
- *  - then the student's saved preference (en / si)
+ *  - then the student's saved preference (en / si / ta)
  *  - then whatever they wrote; a short message with no language signal inherits from the previous student message
- * @param {{ question: string, pref?: "en"|"si"|"auto", history?: {role:string, content:string}[] }} a
+ * @param {{ question: string, pref?: "en"|"si"|"ta"|"auto", history?: {role:string, content:string}[] }} a
  * @returns {{ reply: "en"|"si"|"si_mixed"|"ta", reason: string, detected: ReturnType<typeof detectLanguage> }}
  */
 export function replyLanguage({ question, pref = "auto", history = [] }) {
@@ -98,6 +109,7 @@ export function replyLanguage({ question, pref = "auto", history = [] }) {
   if (asked === "ta") return { reply: "ta", reason: "explicit request", detected };
   if (pref === "en") return { reply: "en", reason: "profile: English", detected };
   if (pref === "si") return { reply: "si", reason: "profile: Sinhala", detected };
+  if (pref === "ta") return { reply: "ta", reason: "profile: Tamil", detected };
   if (detected === "si") return { reply: "si", reason: "wrote Sinhala", detected };
   if (detected === "ta") return { reply: "ta", reason: "wrote Tamil", detected };
   if (detected === "mixed" || detected === "singlish") return { reply: "si_mixed", reason: `wrote ${detected}`, detected };

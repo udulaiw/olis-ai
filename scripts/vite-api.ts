@@ -6,7 +6,7 @@ import type { Plugin, ViteDevServer } from "vite";
 import { loadEnv } from "vite";
 import type { IncomingMessage, ServerResponse } from "node:http";
 
-const ROUTES = ["agent", "generate", "health", "feedback"];
+const ROUTES = ["agent", "generate", "health", "feedback", "subjects", "olis/classify"];
 
 async function toRequest(req: IncomingMessage): Promise<Request> {
   const chunks: Buffer[] = [];
@@ -48,7 +48,7 @@ export function olisApi(): Plugin {
       for (const [k, v] of Object.entries(env)) if (!k.startsWith("VITE_") && process.env[k] === undefined) process.env[k] = v;
 
       server.middlewares.use(async (req, res, next) => {
-        const m = req.url?.match(/^\/api\/([a-z]+)(\?.*)?$/);
+        const m = req.url?.match(/^\/api\/([a-z]+(?:\/[a-z]+)?)(\?.*)?$/);
         if (!m || !ROUTES.includes(m[1])) return next();
         try {
           const mod = (await server.ssrLoadModule(`/api/${m[1]}.ts`)) as Record<string, (r: Request) => Promise<Response>>;

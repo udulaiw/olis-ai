@@ -6,13 +6,14 @@
 // follow-up resolution, exam-level detection, Sinhala Unicode integrity (NFC, ZWJ conjuncts,
 // chunk-split streaming, mojibake, Devanagari guard) and the deterministic maths tool.
 import { readFileSync } from "node:fs";
-import { detectLanguage, replyLanguage, expandQuery, resolveFollowUp, detectExamLevel, explicitLanguageRequest, stemSinhala } from "../server/lang/nlp.mjs";
+import { detectLanguage, replyLanguage, expandQuery, resolveFollowUp, detectExamLevel, explicitLanguageRequest, stemSinhala, stripLanguageRequests } from "../server/lang/nlp.mjs";
 import { cleanSinhala, scanText, repairMojibake, createScriptGuard, fixVisualOrder, looksLikeLegacySinhalaFont, scriptStats } from "../server/lang/unicode.mjs";
 import { tokenize } from "../server/text.mjs";
 import { sseData } from "../server/ai/providers/shared";
 import { sseStream } from "../server/http";
 import { parseProfile, parseContext, str } from "../server/sanitize";
-import { guessTopic, guessSubject, TAXONOMY } from "../server/knowledge/taxonomy";
+import { guessTopic, guessSubject, TAXONOMY, STRATEGIES, strategyFor } from "../server/knowledge/taxonomy";
+import { classifyRequest, type LanguagePref } from "../server/ai/intent";
 import { mathCheck } from "../server/mathcheck";
 import { SI_TERMS } from "../server/lang/glossary.mjs";
 
@@ -103,8 +104,39 @@ await test("glossary: every Sinhala key is NFC and contains no zero-width junk",
 await test("taxonomy: every subject has a level and unique ids", () => {
   const ids = TAXONOMY.map((s) => s.id);
   assert(new Set(ids).size === ids.length, "duplicate subject ids");
-  assert(TAXONOMY.every((s) => s.level === "OL" || s.level === "AL"), "missing level");
+  // "ANY" = cross-level (study skills, general knowledge): shown to O/L and A/L students alike
+  assert(TAXONOMY.every((s) => s.level === "OL" || s.level === "AL" || s.level === "ANY"), "missing level");
 });
+
+// ── Subject registry + router ─────────────────────────────────────────────────
+await test("registry: every subject and unit strategy resolves; aliases are NFC", () => {
+  for (const sub of TAXONOMY) {
+    assert(STRATEGIES[sub.strategy], `${sub.id}: unknown strategy ${sub.strategy}`);
+    for (const u of sub.units) assert(STRATEGIES[strategyFor(sub.id, u.id)], `${sub.id}/${u.id}: unknown strategy`);
+    for (const a of sub.aliases) assert(a === a.normalize("NFC"), `${sub.id}: alias not NFC: ${a}`);
+  }
+  const unitIds = TAXONOMY.flatMap((x) => x.units.map((u) => `${x.id}/${u.id}`));
+  assert(new Set(unitIds).size === unitIds.length, "duplicate unit ids");
+  eq(strategyFor("ol-science", "ol-electricity"), "physics", "O/L Science unit override");
+  eq(strategyFor("nope"), "general", "unknown subject");
+});
+await test("router: answer-language requests are not read as the language subject", () => {
+  eq(stripLanguageRequests("explain osmosis in sinhala"), "explain osmosis", "en");
+  eq(stripLanguageRequests("ප්‍රකාශ සංශ්ලේෂණය සිංහලෙන්"), "ප්‍රකාශ සංශ්ලේෂණය", "si");
+  eq(stripLanguageRequests("Correct this Sinhala essay"), "Correct this Sinhala essay", "subject mention kept");
+});
+await test("profile: Tamil is a valid saved answer language", () => {
+  eq(parseProfile({ language: "ta" })?.language, "ta", "sanitiser");
+  eq(replyLanguage({ question: "what is speed", pref: "ta" }).reply, "ta", "reply");
+  eq(replyLanguage({ question: "what is speed in English", pref: "ta" }).reply, "en", "explicit request still wins");
+});
+for (const c of data.router as { q: string; examLevel?: string; pref?: LanguagePref; want: Record<string, unknown>; note?: string }[]) {
+  await test(`router: ${c.q.slice(0, 70)}`, () => {
+    const r = classifyRequest({ question: c.q, mode: "ask", subject: "General", examLevel: c.examLevel, languagePref: c.pref }) as unknown as Record<string, unknown>;
+    const got: Record<string, unknown> = { ...r, level: r.examLevel, topic: (r.topic as { unit?: string } | undefined)?.unit ?? null, language: r.language };
+    for (const [k, v] of Object.entries(c.want)) eq(got[k] ?? null, v, k);
+  });
+}
 
 // ── Unicode integrity ─────────────────────────────────────────────────────────
 for (const t of data.unicode.must_be_clean as string[]) {

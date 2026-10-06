@@ -327,6 +327,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             patchMsg(chatId, assistantId, { notice: ev.kind });
           } else if (ev.type === "sources") {
             patchMsg(chatId, assistantId, { sources: ev.sources });
+          } else if (ev.type === "meta") {
+            patchMsg(chatId, assistantId, { meta: ev.meta });
           } else if (ev.type === "suggestions") {
             patchMsg(chatId, assistantId, { suggestions: ev.items });
           } else if (ev.type === "quiz") {

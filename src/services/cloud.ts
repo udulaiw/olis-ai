@@ -1,6 +1,6 @@
 // Browser client for the OLIS Cloud backend (/api/*).
 // No API keys live here. The server holds them.
-import type { AgentStep, Flashcard, LearningContext, Mode, Quiz, Source, StudyProfile } from "../types";
+import type { AgentStep, AnswerMeta, Flashcard, LearningContext, Mode, Quiz, Source, StudyProfile } from "../types";
 
 export type CloudErrorCode =
   | "config"
@@ -55,7 +55,8 @@ export type CloudEvent =
   | { type: "text"; delta: string }
   /** An engine failed mid-answer: keep only the first `to` characters. */
   | { type: "rewind"; to: number }
-  | { type: "notice"; kind: "switching" };
+  | { type: "notice"; kind: "switching" }
+  | { type: "meta"; meta: AnswerMeta };
 
 async function errorFrom(res: Response): Promise<OlisError> {
   let code: CloudErrorCode = "server";

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { AgentStep, Source } from "../types";
+import type { AgentStep, AnswerMeta, Source } from "../types";
 import { Icon, type IconName } from "./Icon";
 import { Orb, orbForStep } from "./Orb";
 import { cx } from "../lib/utils";
@@ -102,6 +102,39 @@ export function AgentSteps({ steps, working }: { steps: AgentStep[]; working: bo
         <button className="mt-2 text-xs text-faint hover:text-muted" onClick={() => setExpanded(false)}>
           Hide steps
         </button>
+      )}
+    </div>
+  );
+}
+
+const CONFIDENCE: Record<NonNullable<AnswerMeta["confidence"]>, { label: string; dot: string; hint: string }> = {
+  confident: { label: "High", dot: "bg-success", hint: "Matched a verified OLIS source" },
+  likely: { label: "Medium", dot: "bg-accent", hint: "OLIS sources only partly cover this" },
+  uncertain: { label: "Check working", dot: "bg-lavender", hint: "No OLIS source; verify the working yourself" },
+  insufficient_source: { label: "No OLIS source", dot: "bg-danger", hint: "Nothing in OLIS confirms this. Treat it as general knowledge" },
+};
+
+/** One quiet line under an answer: what OLIS understood the question to be, and how well it is sourced. */
+export function AnswerInsight({ meta, sources, className }: { meta: AnswerMeta; sources?: Source[]; className?: string }) {
+  const olis = sources?.filter((s) => s.kind === "notes" || s.kind === "paper").length ?? 0;
+  const other = (sources?.length ?? 0) - olis;
+  const conf = meta.confidence ? CONFIDENCE[meta.confidence] : null;
+  const parts = [
+    meta.subjectName,
+    meta.topic,
+    meta.level === "OL" ? "O/L" : meta.level === "AL" ? "A/L" : null,
+  ].filter(Boolean) as string[];
+  if (!parts.length && !conf) return null;
+  const srcText = [olis ? `${olis} OLIS source${olis > 1 ? "s" : ""}` : "", other ? `${other} web` : ""].filter(Boolean).join(" · ");
+  return (
+    <div className={cx("animate-fade flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-faint", className)} aria-label="About this answer">
+      {parts.length > 0 && <span className="truncate">{parts.join(" · ")}</span>}
+      {srcText && <span>{srcText}</span>}
+      {conf && (
+        <span className="inline-flex items-center gap-1.5" title={conf.hint}>
+          <span className={cx("h-1.5 w-1.5 rounded-full", conf.dot)} aria-hidden />
+          Confidence: {conf.label}
+        </span>
       )}
     </div>
   );
