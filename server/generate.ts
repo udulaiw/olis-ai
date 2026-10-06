@@ -5,6 +5,15 @@ import { searchKnowledge, relevantHits } from "./rag.js";
 import { expandQuery, detectExamLevel } from "./lang/nlp.mjs";
 import { systemPrompt, type LearningContext, type StudentProfile } from "./prompts.js";
 import { generateJSONWithFallback } from "./ai/router.js";
+import { repairIndicToSinhala } from "./lang/unicode.mjs";
+
+/** Sinhala quizzes/flashcards: same look-alike repair as chat answers (Malayalam/Devanagari letters → Sinhala). */
+function fixSinhala<T>(v: T): T {
+  if (typeof v === "string") return repairIndicToSinhala(v, { devanagari: true }).text as T;
+  if (Array.isArray(v)) return v.map(fixSinhala) as T;
+  if (v && typeof v === "object") return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, fixSinhala(x)])) as T;
+  return v;
+}
 import { newRequestId } from "./ai/log.js";
 import type { Source } from "./tools.js";
 
@@ -65,7 +74,7 @@ Rules: one clearly correct answer; plausible distractors based on real misconcep
         return questions.length ? { title: typeof d.title === "string" && d.title ? d.title : topic, questions } : null;
       },
     });
-    return { data, sources };
+    return { data: lang ? fixSinhala(data) : data, sources };
   }
 
   const { data } = await generateJSONWithFallback({
@@ -79,5 +88,5 @@ Fronts are questions or prompts; backs are short, exam-accurate answers. LaTeX (
       return cards.length ? { title: typeof d.title === "string" && d.title ? d.title : topic, cards } : null;
     },
   });
-  return { data, sources };
+  return { data: lang ? fixSinhala(data) : data, sources };
 }

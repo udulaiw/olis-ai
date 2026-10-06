@@ -10,6 +10,10 @@ export const RE = {
   sinhala: /[\u0D80-\u0DFF]/g,
   devanagari: /[ऀ-ॿ]/g,
   tamil: /[஀-௿]/g,
+  /** Malayalam: the block right before Sinhala (U+0D00–0D7F). Models swap look-alike letters ("കൊළඹ" for "කොළඹ"). */
+  malayalam: /[\u0D00-\u0D7F]/g,
+  /** Bengali, Gurmukhi, Gujarati, Oriya, Telugu, Kannada: never expected in an OLIS answer. */
+  otherIndic: /[\u0980-\u0B7F\u0C00-\u0CFF]/g,
   latin: /[A-Za-z]/g,
   replacement: /�/g,
 };
@@ -22,6 +26,8 @@ export function scriptStats(text) {
     sinhala: count(text, RE.sinhala),
     devanagari: count(text, RE.devanagari),
     tamil: count(text, RE.tamil),
+    malayalam: count(text, RE.malayalam),
+    otherIndic: count(text, RE.otherIndic),
     latin: count(text, RE.latin),
     replacement: count(text, RE.replacement),
     length: text.length,
@@ -91,6 +97,8 @@ export function scanText(text, expect = "any") {
   if (/[À-ÿ][\u0080-¿Œ-ƒ‘-›]/.test(text) && repairMojibake(text).repaired) issues.push({ code: "mojibake", detail: "UTF-8 decoded as Latin-1" });
   if (st.devanagari && expect !== "any" && expect !== "hi") issues.push({ code: "devanagari", detail: `${st.devanagari} Devanagari chars in ${expect} text` });
   if (st.tamil && (expect === "si" || expect === "en")) issues.push({ code: "tamil", detail: `${st.tamil} Tamil chars in ${expect} text` });
+  if (st.malayalam && expect !== "any") issues.push({ code: "malayalam", detail: `${st.malayalam} Malayalam chars in ${expect} text` });
+  if (st.otherIndic && expect !== "any") issues.push({ code: "other_indic", detail: `${st.otherIndic} Bengali/Telugu/Kannada/… chars in ${expect} text` });
   if (/\?{3,}/.test(text)) issues.push({ code: "question_marks", detail: "run of ??? (lossy encoding)" });
 
   // malformed combining sequences (Sinhala only)
@@ -131,6 +139,9 @@ export function createScriptGuard(expect) {
     if (st.devanagari) return { code: "devanagari", detail: `${st.devanagari} Devanagari chars` };
     if (st.replacement) return { code: "replacement_char", detail: "U+FFFD in output" };
     if (st.tamil && expect !== "ta") return { code: "tamil", detail: `${st.tamil} Tamil chars` };
+    // Sinhala answers have Malayalam repaired before the guard sees it (repairIndicToSinhala); anywhere else it is wrong
+    if (st.malayalam) return { code: "malayalam", detail: `${st.malayalam} Malayalam chars` };
+    if (st.otherIndic) return { code: "other_indic", detail: `${st.otherIndic} other Indic chars` };
     return null;
   };
 }
@@ -167,4 +178,67 @@ export function looksLikeLegacySinhalaFont(text) {
   const hits = words.filter((w) => common.has(w)).length;
   const odd = (t.match(/[À-ÿŒ-ƒ‘-›;{}\[\]|~`^]/g) ?? []).length;
   return words.length > 30 && hits / words.length < 0.04 && odd / t.length > 0.04;
+}
+
+// ── Look-alike repair: Malayalam / Devanagari letters inside a Sinhala answer ──
+//
+// Sinhala, Malayalam and Devanagari are all Brahmic scripts with the same letter
+// inventory and the same consonant + vowel-sign structure, so a stray letter maps
+// one-to-one onto the Sinhala letter with the same sound: "കൊළඹ പැത്തේ" → "කොළඹ පැත්තේ".
+// Stateless per character, so it is safe on a stream split anywhere.
+
+const CONS = "කඛගඝඞචඡජඣඤටඨඩඪණතථදධනපඵබභමයරලවශෂසහළ";
+/** Devanagari / Malayalam consonants in the same order as CONS. */
+const DEVA_CONS = "कखगघङचछजझञटठडढणतथदधनपफबभमयरलवशषसहळ";
+const MLYM_CONS = "കഖഗഘങചഛജഝഞടഠഡഢണതഥദധനപഫബഭമയരലവശഷസഹള";
+const VOWELS = { si: "අආඉඊඋඌඍඑඒඓඔඕඖ", deva: "अआइईउऊऋऎएऐऒओऔ", mlym: "അആഇഈഉഊഋഎഏഐഒഓഔ" };
+const SIGNS = { si: "ාිීුූෘෙේෛොෝෞ්ංඃ", deva: "ािीुूृॆेैॊोौ्ंः", mlym: "ാിീുൂൃെേൈൊോൌ്ംഃ" };
+
+const LOOKALIKE = new Map();
+for (let i = 0; i < CONS.length; i++) {
+  LOOKALIKE.set(DEVA_CONS[i], CONS[i]);
+  LOOKALIKE.set(MLYM_CONS[i], CONS[i]);
+}
+for (const k of ["deva", "mlym"]) {
+  [...VOWELS[k]].forEach((c, i) => LOOKALIKE.set(c, VOWELS.si[i]));
+  [...SIGNS[k]].forEach((c, i) => LOOKALIKE.set(c, SIGNS.si[i]));
+}
+// Extras: Malayalam ṟa / ḻa, chillu (consonant with built-in virama), au length mark;
+// Devanagari candrabindu, nukta, danda; both scripts' digits.
+for (const [k, v] of Object.entries({
+  "റ": "ර", "ഴ": "ළ", "ൺ": "ණ්", "ൻ": "න්", "ർ": "ර්", "ൽ": "ල්", "ൾ": "ළ්", "ൿ": "ක්", "ൗ": "ෟ",
+  "ँ": "ං", "़": "", "।": ".", "॥": ".",
+})) LOOKALIKE.set(k, v);
+for (let d = 0; d < 10; d++) {
+  LOOKALIKE.set(String.fromCharCode(0x0966 + d), String(d));
+  LOOKALIKE.set(String.fromCharCode(0x0D66 + d), String(d));
+}
+
+/**
+ * Map Malayalam (always) and, when `devanagari` is true, Devanagari letters to their Sinhala
+ * equivalents. Returns the text and how many characters changed. Text in any other script is untouched.
+ * @param {string} text
+ * @param {{ devanagari?: boolean }} [opts]
+ */
+export function repairIndicToSinhala(text, opts = {}) {
+  let changed = 0;
+  let out = "";
+  let viramaMapped = false; // the previous char was a repaired virama: "്ര" / "्य" must become rakaransaya / yansaya (්\u200Dර)
+  for (const ch of text) {
+    const cp = ch.codePointAt(0);
+    const isMl = cp >= 0x0d00 && cp <= 0x0d7f;
+    const isDeva = opts.devanagari && cp >= 0x0900 && cp <= 0x097f;
+    if ((isMl || isDeva) && LOOKALIKE.has(ch)) {
+      const si = LOOKALIKE.get(ch);
+      if (viramaMapped && (si === "ර" || si === "ය")) out += "\u200D";
+      out += si;
+      viramaMapped = si === "්";
+      changed++;
+    } else {
+      if (viramaMapped && (ch === "ර" || ch === "ය")) out += "\u200D";
+      out += ch;
+      viramaMapped = false;
+    }
+  }
+  return { text: changed ? out.normalize("NFC") : text, changed };
 }

@@ -7,7 +7,7 @@
 // chunk-split streaming, mojibake, Devanagari guard) and the deterministic maths tool.
 import { readFileSync } from "node:fs";
 import { detectLanguage, replyLanguage, expandQuery, resolveFollowUp, detectExamLevel, explicitLanguageRequest, stemSinhala, stripLanguageRequests } from "../server/lang/nlp.mjs";
-import { cleanSinhala, scanText, repairMojibake, createScriptGuard, fixVisualOrder, looksLikeLegacySinhalaFont, scriptStats } from "../server/lang/unicode.mjs";
+import { cleanSinhala, scanText, repairMojibake, createScriptGuard, fixVisualOrder, looksLikeLegacySinhalaFont, scriptStats, repairIndicToSinhala } from "../server/lang/unicode.mjs";
 import { tokenize } from "../server/text.mjs";
 import { sseData } from "../server/ai/providers/shared";
 import { sseStream } from "../server/http";
@@ -142,6 +142,30 @@ for (const c of data.router as { q: string; examLevel?: string; pref?: LanguageP
     for (const [k, v] of Object.entries(c.want)) eq(got[k] ?? null, v, k);
   });
 }
+
+// ── Look-alike scripts (Malayalam / Devanagari letters in Sinhala) ────────────
+await test("lookalike: the reported 'കൊළඹ പැത്തේ' becomes 'කොළඹ පැත්තේ' byte-for-byte", () => {
+  const r = repairIndicToSinhala("\u0d15\u0d4a\u0dc5\u0db9 \u0d2a\u0dd0\u0d24\u0d4d\u0d24\u0d47");
+  eq(r.text, "කොළඹ පැත්තේ".normalize("NFC"), "text");
+  eq(r.changed, 7, "changed");
+  eq(scanText(r.text, "si"), [], "clean afterwards");
+});
+await test("lookalike: conjuncts get the ZWJ (ශ්‍රී, විද්‍යුත්); chillu letters keep their virama", () => {
+  eq(repairIndicToSinhala("ശ്രീ").text, "ශ්\u200dරී", "rakaransaya");
+  eq(repairIndicToSinhala("विद्युत्", { devanagari: true }).text, "විද්\u200dයුත්", "yansaya");
+  eq(repairIndicToSinhala("കൺ").text, "කණ්", "chillu");
+});
+await test("lookalike: valid Sinhala, English, Tamil and (by default) Devanagari are never changed", () => {
+  for (const t of ["ශ්‍රී ලංකාව විද්‍යාව", "Colombo, Sri Lanka", "தமிழ் மொழி", "$F = ma$ 123"]) eq(repairIndicToSinhala(t), { text: t, changed: 0 }, t);
+  eq(repairIndicToSinhala("बल").changed, 0, "Devanagari needs opt-in (it is retried first)");
+});
+await test("guard: Malayalam and other Indic scripts are flagged outside Sinhala answers", () => {
+  eq(createScriptGuard("en")("Colombo കേരളം")?.code, "malayalam", "malayalam in English");
+  eq(createScriptGuard("si")("తెలుగు")?.code, "other_indic", "Telugu");
+  eq(createScriptGuard("si")("ಕನ್ನಡ")?.code, "other_indic", "Kannada");
+  eq(createScriptGuard("si")("ශ්‍රී ලංකාව"), null, "clean Sinhala");
+  assert(scanText("කොළඹ \u0d2a", "si").some((i) => i.code === "malayalam"), "scanText misses Malayalam");
+});
 
 // ── Live data routing ─────────────────────────────────────────────────────────
 for (const [q, want] of data.live_routing as [string, string | null][]) {
