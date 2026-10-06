@@ -2,6 +2,7 @@ import { useEffect, useRef, type ReactNode } from "react";
 import { useStore } from "../store/AppStore";
 import { Icon, type IconName } from "./Icon";
 import { cx } from "../lib/utils";
+import { Dropdown, plainOptions } from "./Dropdown";
 import { LANGUAGES, LEVELS, STYLES, SUBJECTS, type Language, type Level, type LearningStyle, type Subject } from "../types";
 
 // ── Toasts ─────────────────────────────────────
@@ -113,26 +114,8 @@ function SelectChip<T extends string>({
   onChange: (v: T) => void;
   labels?: Partial<Record<T, string>>;
 }) {
-  return (
-    <label className="chip relative cursor-pointer pr-7 focus-within:border-line-strong focus-within:text-ink" title={label}>
-      <Icon name={icon} size={14} className="shrink-0 text-faint" />
-      <span className="sr-only">{label}</span>
-      <span className="truncate">{labels?.[value] ?? value}</span>
-      <Icon name="chevronDown" size={13} className="pointer-events-none absolute right-2.5 text-faint" />
-      <select
-        className="absolute inset-0 cursor-pointer opacity-0"
-        value={value}
-        onChange={(e) => onChange(e.target.value as T)}
-        aria-label={label}
-      >
-        {options.map((o) => (
-          <option key={o} value={o}>
-            {labels?.[o] ?? o}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
+  // Themed list instead of a native <select>: Windows draws native option lists unthemed (white, faint text)
+  return <Dropdown<T> variant="chip" icon={icon} label={label} header={label} value={value} options={plainOptions(options, labels)} onChange={onChange} />;
 }
 
 const LANGUAGE_LABELS = Object.fromEntries(LANGUAGES.map((l) => [l.id, l.label])) as Record<Language, string>;

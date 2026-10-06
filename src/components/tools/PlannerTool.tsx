@@ -6,6 +6,7 @@ import { load, remove, save } from "../../lib/storage";
 import { copyText, cx, daysUntil, toISODate } from "../../lib/utils";
 import { Icon } from "../Icon";
 import { ConfirmDialog, EmptyState, Spinner } from "../ui";
+import { Dropdown, plainOptions } from "../Dropdown";
 
 const KEY = "olis.plan";
 const PHASE_STYLE: Record<string, string> = {
@@ -84,14 +85,10 @@ export function PlannerTool() {
   return (
     <div>
       <div className="card grid gap-4 p-5 sm:grid-cols-3">
-        <label className="block">
+        <div className="block">
           <span className="mb-1.5 block text-xs font-medium text-muted">Subject</span>
-          <select className="field" value={subject} onChange={(e) => setSubject(e.target.value as Subject)}>
-            {SUBJECTS.map((s) => (
-              <option key={s}>{s}</option>
-            ))}
-          </select>
-        </label>
+          <Dropdown<Subject> label="Subject" icon="book" value={subject} options={plainOptions(SUBJECTS)} onChange={setSubject} />
+        </div>
         <label className="block">
           <span className="mb-1.5 block text-xs font-medium text-muted">Exam date</span>
           <input type="date" className="field" min={tomorrow} value={date} onChange={(e) => setDate(e.target.value)} />

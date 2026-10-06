@@ -4,6 +4,7 @@ import { useState, type KeyboardEvent } from "react";
 import { useStore } from "../store/AppStore";
 import { Icon } from "./Icon";
 import { EXAM_LEVELS, PROFILE_SUBJECTS, STREAMS } from "../types";
+import { Dropdown } from "./Dropdown";
 
 
 function Field({ label, hint, children, htmlFor }: { label: string; hint?: string; children: React.ReactNode; htmlFor?: string }) {
@@ -80,13 +81,7 @@ export function StudyProfileEditor() {
 
       <div className="grid gap-5 sm:grid-cols-2">
         <Field label="A/L stream" htmlFor="pf-stream">
-          <select id="pf-stream" className="field" value={p.stream} onChange={(e) => setProfile({ stream: e.target.value })}>
-            {STREAMS.map((s) => (
-              <option key={s} value={s}>
-                {s || "Not set"}
-              </option>
-            ))}
-          </select>
+          <Dropdown<string> id="pf-stream" label="A/L stream" value={p.stream} options={STREAMS.map((s) => ({ value: s, label: s || "Not set" }))} onChange={(stream) => setProfile({ stream })} />
         </Field>
       </div>
 
