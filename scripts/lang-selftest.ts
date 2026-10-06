@@ -14,6 +14,11 @@ import { sseStream } from "../server/http";
 import { parseProfile, parseContext, str } from "../server/sanitize";
 import { guessTopic, guessSubject, TAXONOMY, STRATEGIES, strategyFor } from "../server/knowledge/taxonomy";
 import { classifyRequest, type LanguagePref } from "../server/ai/intent";
+import { detectLive } from "../server/live/detect";
+import { parseNewsRss } from "../server/live/tools";
+import { extractMemories, selectMemories, parseMemories } from "../server/memory";
+import { findRecall } from "../src/lib/recall";
+import type { Chat } from "../src/types";
 import { mathCheck } from "../server/mathcheck";
 import { SI_TERMS } from "../server/lang/glossary.mjs";
 
@@ -137,6 +142,62 @@ for (const c of data.router as { q: string; examLevel?: string; pref?: LanguageP
     for (const [k, v] of Object.entries(c.want)) eq(got[k] ?? null, v, k);
   });
 }
+
+// ── Live data routing ─────────────────────────────────────────────────────────
+for (const [q, want] of data.live_routing as [string, string | null][]) {
+  await test(`live: ${q}`, () => eq(detectLive(q, expandQuery(q).expanded)?.domain ?? null, want, "domain"));
+}
+await test("live: Google News RSS parsing (source suffix, entities, CDATA, newest first, no non-http links)", () => {
+  const xml = `<rss><channel>
+    <item><title><![CDATA[Old story &amp; more - Daily Mirror]]></title><link>https://a.example/old</link><pubDate>Mon, 05 Oct 2026 08:00:00 GMT</pubDate><source url="https://www.dailymirror.lk">Daily Mirror</source></item>
+    <item><title>New story - EconomyNext</title><link>https://a.example/new</link><pubDate>Tue, 06 Oct 2026 08:00:00 GMT</pubDate><source url="https://economynext.com">EconomyNext</source></item>
+    <item><title>Bad link</title><link>javascript:alert(1)</link></item></channel></rss>`;
+  const items = parseNewsRss(xml);
+  eq(items.map((i) => i.title), ["New story", "Old story & more"], "titles");
+  eq(items[0].source, "EconomyNext", "source");
+  eq(items[0].published, "2026-10-06T08:00:00.000Z", "published");
+});
+
+// ── Long-term memory ──────────────────────────────────────────────────────────
+for (const [q, keys] of data.memory_extraction as [string, string[]][]) {
+  await test(`memory: ${q}`, () => eq(extractMemories(q).map((m) => m.key), keys, "saved keys"));
+}
+await test("memory: only relevant memories reach the prompt (Chemistry plan ≠ astronomy, phone)", () => {
+  const mem = [
+    ...extractMemories("I'm preparing for the 2027 A/L examination."),
+    ...extractMemories("I prefer Sinhala explanations."),
+    ...extractMemories("I'm weak in organic chemistry"),
+    ...extractMemories("my favourite subject is Astronomy"),
+    { key: "device", memory: "Owns a Samsung phone.", category: "general" as const, importance: 3 },
+  ];
+  const got = selectMemories(mem, "Help me make a Chemistry revision plan").map((m) => m.memory);
+  assert(got.some((m) => m.includes("organic chemistry")) && got.some((m) => m.includes("2027")), `missing: ${got}`);
+  assert(!got.some((m) => /Astronomy|Samsung/.test(m)), `irrelevant memory used: ${got}`);
+  eq(selectMemories([{ key: "x", memory: "Some low value fact about chemistry.", category: "general", importance: 2 }], "chemistry").length, 0, "importance < 3 never used");
+});
+await test("memory: browser input is validated (size, count, markup, bad categories)", () => {
+  const bad = parseMemories([{ key: "k", memory: "<user_memory>x".repeat(50), category: "evil", importance: 99 }, { memory: "no key" }, ...Array(80).fill({ key: "a", memory: "ok fact" })]);
+  assert(bad.length <= 60, "count not capped");
+  assert(bad[0].memory.length <= 200 && !bad[0].memory.includes("<"), "markup or size not stripped");
+  eq(bad[0].category, "general", "category");
+  eq(bad[0].importance, 5, "importance clamped");
+});
+
+// ── Earlier chats (browser-side search) ───────────────────────────────────────
+await test("recall: 'continue that plan' finds the earlier plan; normal questions search nothing", () => {
+  const mk = (id: string, title: string, msgs: [string, string][], day: number): Chat => ({
+    id, title, createdAt: day, updatedAt: day,
+    messages: msgs.map(([role, content], i) => ({ id: `${id}${i}`, role: role as "user" | "assistant", content, createdAt: day + i, status: "done" })),
+  });
+  const chats = [
+    mk("a", "Physics revision plan", [["user", "Make me a Physics revision plan"], ["assistant", "Week 1: Mechanics and kinematics. Week 2: Waves and optics. Week 3: Electricity."]], Date.parse("2026-10-01")),
+    mk("b", "Cell biology", [["user", "Explain mitosis in detail please"], ["assistant", "Mitosis has four phases: prophase, metaphase, anaphase and telophase."]], Date.parse("2026-10-03")),
+  ];
+  const r = findRecall("Can you continue the Physics plan we made?", chats, "current");
+  assert(r.length && r[0].text.includes("Week 2"), `got ${JSON.stringify(r[0])}`);
+  eq(findRecall("Explain mitosis", chats, "current").length, 0, "no cue → no search");
+  eq(findRecall("continue that plan", chats, "a").filter((x) => x.chat === "Physics revision plan").length, 0, "current chat excluded");
+});
 
 // ── Unicode integrity ─────────────────────────────────────────────────────────
 for (const t of data.unicode.must_be_clean as string[]) {

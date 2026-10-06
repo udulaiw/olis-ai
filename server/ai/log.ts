@@ -5,7 +5,7 @@
 import { redact } from "./classify.js";
 
 export interface AiLogEvent {
-  evt: "ai.call" | "ai.fallback" | "ai.exhausted" | "ai.policy_block" | "ai.budget" | "ai.script_guard" | "ai.retrieval";
+  evt: "ai.call" | "ai.fallback" | "ai.exhausted" | "ai.policy_block" | "ai.budget" | "ai.script_guard" | "ai.retrieval" | "ai.route";
   requestId?: string;
   route?: string; // agent | generate
   task?: string;
@@ -31,6 +31,9 @@ export interface AiLogEvent {
   subject?: string;
   intent?: string;
   difficulty?: string;
+  /** ai.route: sources used ("rag,memory,live:crypto") and live-data outcome */
+  tools?: string;
+  live?: string;
 }
 
 const quiet = () => process.env.OLIS_AI_LOGS === "off";

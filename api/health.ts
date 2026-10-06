@@ -10,7 +10,7 @@ import { indexStats } from "../server/rag.js";
 import { providerHealth, publicEngineSummary } from "../server/ai/status.js";
 import { probeAll } from "../server/ai/probe.js";
 
-const VERSION = "0.4.0-beta";
+const VERSION = "0.5.0-beta";
 
 function tokenOk(given: string | null, expected: string) {
   if (!expected || !given) return false;

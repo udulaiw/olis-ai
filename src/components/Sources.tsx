@@ -114,6 +114,17 @@ const CONFIDENCE: Record<NonNullable<AnswerMeta["confidence"]>, { label: string;
   insufficient_source: { label: "No OLIS source", dot: "bg-danger", hint: "Nothing in OLIS confirms this. Treat it as general knowledge" },
 };
 
+/** "just now", "4 min ago", "3 h ago", or a date for anything older than a day. */
+export function ago(isoTime: string | null | undefined, now = Date.now()): string | null {
+  const t = isoTime ? Date.parse(isoTime) : NaN;
+  if (!Number.isFinite(t)) return null;
+  const s = Math.max(0, Math.round((now - t) / 1000));
+  if (s < 60) return "just now";
+  if (s < 3600) return `${Math.round(s / 60)} min ago`;
+  if (s < 86400) return `${Math.round(s / 3600)} h ago`;
+  return new Date(t).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+}
+
 /** One quiet line under an answer: what OLIS understood the question to be, and how well it is sourced. */
 export function AnswerInsight({ meta, sources, className }: { meta: AnswerMeta; sources?: Source[]; className?: string }) {
   const olis = sources?.filter((s) => s.kind === "notes" || s.kind === "paper").length ?? 0;
@@ -124,12 +135,25 @@ export function AnswerInsight({ meta, sources, className }: { meta: AnswerMeta; 
     meta.topic,
     meta.level === "OL" ? "O/L" : meta.level === "AL" ? "A/L" : null,
   ].filter(Boolean) as string[];
-  if (!parts.length && !conf) return null;
+  const live = meta.live;
+  const fresh = live?.ok ? ago(live.dataTimestamp) ?? ago(live.retrievedAt) : null;
+  const usedContext = (meta.context?.previousChats ?? 0) > 0;
+  if (!parts.length && !conf && !live && !usedContext) return null;
   const srcText = [olis ? `${olis} OLIS source${olis > 1 ? "s" : ""}` : "", other ? `${other} web` : ""].filter(Boolean).join(" · ");
   return (
     <div className={cx("animate-fade flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-faint", className)} aria-label="About this answer">
       {parts.length > 0 && <span className="truncate">{parts.join(" · ")}</span>}
       {srcText && <span>{srcText}</span>}
+      {live && (
+        <span
+          className="inline-flex items-center gap-1.5"
+          title={live.ok ? `Retrieved ${new Date(live.retrievedAt).toLocaleString()}${live.dataTimestamp ? ` · data from ${new Date(live.dataTimestamp).toLocaleString()}` : ""}` : "OLIS couldn't reach the live source, so no current figure was given"}
+        >
+          <span className={cx("h-1.5 w-1.5 rounded-full", live.ok ? "bg-success" : "bg-danger")} aria-hidden />
+          {live.ok ? `Live · ${live.source}${fresh ? ` · updated ${fresh}` : ""}` : "Live data unavailable"}
+        </span>
+      )}
+      {usedContext && <span>Used an earlier chat</span>}
       {conf && (
         <span className="inline-flex items-center gap-1.5" title={conf.hint}>
           <span className={cx("h-1.5 w-1.5 rounded-full", conf.dot)} aria-hidden />

@@ -20,6 +20,8 @@ import { streamWithFallback } from "./ai/router.js";
 import { newRequestId, aiLog } from "./ai/log.js";
 import { createScriptGuard } from "./lang/unicode.mjs";
 import type { ChatMessage, ImageInput, ToolCall } from "./ai/types.js";
+import { extractMemories, selectMemories, languageFromMemory, levelFromMemory, type MemoryItem } from "./memory.js";
+import { fetchLive, type LiveResult } from "./live/tools.js";
 
 export type AgentEvent =
   | { type: "step"; id: string; label: string; status: "running" | "done" | "failed" }
@@ -29,7 +31,9 @@ export type AgentEvent =
   | { type: "rewind"; to: number }
   | { type: "notice"; kind: "switching" }
   /** What OLIS understood the question to be (shown under the answer). Labels only. */
-  | { type: "meta"; meta: AnswerMeta };
+  | { type: "meta"; meta: AnswerMeta }
+  /** New long-term memories for the browser to save (it stores them; the server keeps nothing). */
+  | { type: "memory"; saved: MemoryItem[] };
 
 export interface AnswerMeta {
   subject: string | null;
@@ -38,8 +42,20 @@ export interface AnswerMeta {
   level: "OL" | "AL" | null;
   intent: Intent;
   reply: string;
-  /** From retrieval evidence; null when not applicable (greetings, plans, attached documents). */
+  /** From retrieval evidence; null when not applicable (greetings, plans, attached documents, live data). */
   confidence: Confidence | null;
+  /** Live data used for this answer: where from and how fresh. */
+  live?: { domain: string; ok: boolean; source: string; retrievedAt: string; dataTimestamp: string | null } | null;
+  /** How much of the student's own context was used (counts only). */
+  context?: { memories: number; previousChats: number };
+}
+
+/** A message from one of the student's earlier chats, found in their browser (src/lib/recall.ts). */
+export interface RecallItem {
+  chat: string;
+  date: string;
+  role: "user" | "assistant";
+  text: string;
 }
 
 export interface AgentRequest {
@@ -49,6 +65,12 @@ export interface AgentRequest {
   mode: string;
   context: LearningContext;
   profile?: StudentProfile;
+  /** The student's saved long-term memories (from their browser). */
+  memories?: MemoryItem[];
+  /** False when the student turned memory off: nothing is extracted or used. */
+  memoryEnabled?: boolean;
+  /** Messages from earlier chats that may answer "continue that plan" questions. */
+  recall?: RecallItem[];
 }
 
 const clip = (s: string, n: number) => (s.length > n ? s.slice(0, n) + "…" : s);
@@ -82,6 +104,14 @@ export async function* runAgent(cfg: Config, req: AgentRequest, signal?: AbortSi
   const decls = toolDeclarations(cfg);
   const history = req.messages.slice(0, -1).slice(-12);
   const question = req.messages[req.messages.length - 1]?.content ?? "";
+  const t0 = Date.now();
+  const toolsUsed: string[] = [];
+  const memoryOn = req.memoryEnabled !== false;
+  // New facts in this message count immediately ("I prefer Sinhala. Explain osmosis.")
+  const extracted = memoryOn ? extractMemories(question) : [];
+  const memories: MemoryItem[] = memoryOn ? [...extracted, ...(req.memories ?? []).filter((m) => !extracted.some((e) => e.key === m.key))] : [];
+  // A saved preference applies when the profile says "auto"; the profile always wins when set
+  const languagePref = req.profile?.language && req.profile.language !== "auto" ? req.profile.language : (languageFromMemory(memories) ?? req.profile?.language);
 
   const cls = classifyRequest({
     question,
@@ -89,12 +119,61 @@ export async function* runAgent(cfg: Config, req: AgentRequest, signal?: AbortSi
     subject: req.context.subject,
     imageCount: req.images?.length ?? 0,
     attachmentChars: req.attachment?.length ?? 0,
-    languagePref: req.profile?.language,
+    languagePref,
     history,
     stream: req.profile?.stream,
-    examLevel: req.profile?.examLevel,
+    examLevel: req.profile?.examLevel ?? levelFromMemory(memories),
   });
   let stepN = 0;
+
+  // 0) Long-term memory: save what's new, use only what's relevant to THIS question
+  if (extracted.length) {
+    yield { type: "memory", saved: extracted };
+    yield { type: "step", id: `s${++stepN}`, label: `Saved to memory: ${extracted.map((m) => m.memory.replace(/\.$/, "")).join("; ")}`, status: "done" };
+    toolsUsed.push("memory_write");
+  }
+  const usedMemories = memoryOn ? selectMemories(memories, `${question} ${cls.retrievalQuery}`, { askingAboutSelf: cls.requiresMemory }) : [];
+  if (usedMemories.length) toolsUsed.push("memory");
+  const memoryBlock = usedMemories.length
+    ? `<user_memory>\nFacts the student saved in OLIS memory (from earlier chats). Use them only where they help this answer.\n${usedMemories.map((m) => `- ${m.memory}`).join("\n")}\n</user_memory>`
+    : "";
+
+  // 0b) Earlier conversations: only when the question refers to one
+  const recall = cls.requiresHistory && memoryOn ? (req.recall ?? []).slice(0, 4) : [];
+  if (cls.requiresHistory) {
+    yield { type: "step", id: `s${++stepN}`, label: recall.length ? `Using your previous chats (${recall.length} matching message${recall.length > 1 ? "s" : ""})` : "Checked your previous chats: nothing matched", status: "done" };
+    toolsUsed.push("history");
+  }
+  const historyBlock = recall.length
+    ? `<previous_conversations>\nMessages from the student's EARLIER chats that match this question (found in their saved history). Refer to them as "in our earlier chat".\n${recall.map((r) => `[${r.date} · "${clip(r.chat, 60)}" · ${r.role === "user" ? "student" : "OLIS"}]\n${clip(r.text, 900)}`).join("\n\n")}\n</previous_conversations>`
+    : "";
+
+  // 0c) Live data: prices, rates, weather, news. Fetched BEFORE the model answers, never guessed.
+  let live: LiveResult | null = null;
+  let liveBlock = "";
+  if (cls.live) {
+    const id = `s${++stepN}`;
+    yield { type: "step", id, label: cls.live.domain === "news" || cls.live.domain === "sports" || cls.live.domain === "web" ? "Searching for the latest information" : "Getting live data", status: "running" };
+    live = await fetchLive(cfg, cls.live, signal);
+    toolsUsed.push(`live:${cls.live.domain}`);
+    if (live.ok) {
+      const added = live.items?.length
+        ? live.items.map((it) => reg.add({ kind: "web", title: it.title, url: it.url, snippet: `${it.source}${it.published ? ` · ${it.published.slice(0, 16).replace("T", " ")} UTC` : ""}` }))
+        : [reg.add({ kind: "web", title: `${live.label} · ${live.source.name}`, url: live.source.url, snippet: `Data time: ${live.dataTimestamp ?? "not given"} · retrieved ${live.retrievedAt}` })];
+      yield { type: "step", id, label: `Live data: ${live.label} (${live.source.name})`, status: "done" };
+      yield { type: "sources", sources: [...reg.list] };
+      liveBlock = [
+        `<live_data current_data_available="true" source="${live.source.name}" retrieved_at="${live.retrievedAt}" data_timestamp="${live.dataTimestamp ?? "unknown"}">`,
+        live.data ? JSON.stringify(live.data) : "",
+        live.items?.length ? live.items.map((it, i) => `[${added[i].ref}] ${it.title} (${it.source}${it.published ? `, ${it.published}` : ", undated"})${"content" in it ? `\n${clip(String((it as { content?: string }).content), 500)}` : ""}`).join("\n") : `Cite as [${added[0].ref}].`,
+        live.note ? `Note: ${live.note}` : "",
+        `</live_data>`,
+      ].filter(Boolean).join("\n");
+    } else {
+      yield { type: "step", id, label: `Couldn't get live data right now`, status: "failed" };
+      liveBlock = `<live_data current_data_available="false" reason="${(live.error ?? "unavailable").replace(/"/g, "'")}"></live_data>`;
+    }
+  }
 
   // 1) RAG: always check the curated notes first (cheap, grounded, citeable).
   //    Search with the normalised/expanded query (Sinhala + Singlish → English terms) and,
@@ -148,8 +227,11 @@ export async function* runAgent(cfg: Config, req: AgentRequest, signal?: AbortSi
       intent: cls.intent,
       reply: cls.reply,
       confidence: req.attachment ? null : confidenceOf(grounding, cls.intent),
+      live: live ? { domain: live.domain, ok: live.ok, source: live.source.name, retrievedAt: live.retrievedAt, dataTimestamp: live.dataTimestamp } : null,
+      context: { memories: usedMemories.length, previousChats: recall.length },
     },
   };
+  if (grounding) toolsUsed.push("rag");
 
   const buildSystem = (scriptRetry = false) =>
     systemPrompt(req.context, req.mode, {
@@ -169,6 +251,9 @@ export async function* runAgent(cfg: Config, req: AgentRequest, signal?: AbortSi
       difficulty: cls.difficulty,
       requiresCurrentInfo: cls.requiresCurrentInfo,
       today: new Date().toISOString().slice(0, 10),
+      live: live ? { ok: live.ok, domain: live.domain } : null,
+      memory: { enabled: memoryOn, used: usedMemories.length, askingAboutSelf: cls.requiresMemory },
+      history: { asked: cls.requiresHistory, found: recall.length },
     });
   let system = buildSystem();
   // The script the answer must stay in. Off when the student themselves is working in Hindi/Tamil.
@@ -179,10 +264,13 @@ export async function* runAgent(cfg: Config, req: AgentRequest, signal?: AbortSi
   // 2) Build the conversation (neutral format; the router adapts it per provider)
   const hasImages = Boolean(req.images?.length);
   const userText = [
+    liveBlock,
+    memoryBlock,
+    historyBlock,
     kbBlock,
     req.attachment ? `<student_document>\n${clip(req.attachment, 30000)}\n</student_document>` : "",
     hasImages ? `(The student attached ${req.images!.length} image${req.images!.length > 1 ? "s" : ""}, e.g. a photo of a question or their working. Read it carefully.)` : "",
-    kbBlock || req.attachment || hasImages ? `STUDENT'S MESSAGE:\n${question || "Please help me with the attached."}` : question,
+    kbBlock || liveBlock || memoryBlock || historyBlock || req.attachment || hasImages ? `STUDENT'S MESSAGE:\n${question || "Please help me with the attached."}` : question,
   ]
     .filter(Boolean)
     .join("\n\n");
@@ -301,4 +389,6 @@ export async function* runAgent(cfg: Config, req: AgentRequest, signal?: AbortSi
   }
 
   if (!wroteText) yield { type: "text", delta: "I couldn't put together an answer this time. Please try rephrasing your question." };
+  // One routing line per request: what was used and how long it took. Labels only, never the question or answer.
+  aiLog({ evt: "ai.route", requestId, route: "agent", intent: cls.intent, subject: cls.subject ?? "none", tools: toolsUsed.join(",") || "model", ms: Date.now() - t0, ok: wroteText, live: live ? (live.ok ? "ok" : "failed") : undefined });
 }

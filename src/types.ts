@@ -133,6 +133,33 @@ export interface AnswerMeta {
   reply: string;
   /** confident = matched a verified OLIS source; insufficient_source = nothing in OLIS confirms it. */
   confidence: "confident" | "likely" | "uncertain" | "insufficient_source" | null;
+  /** Live data used: source and how fresh it is. */
+  live?: { domain: string; ok: boolean; source: string; retrievedAt: string; dataTimestamp: string | null } | null;
+  /** How much saved context was used (counts). */
+  context?: { memories: number; previousChats: number };
+}
+
+/** Something OLIS remembers about the student across chats. Stored in this browser only. */
+export interface MemoryItem {
+  /** A newer fact with the same key replaces the old one. */
+  key: string;
+  memory: string;
+  category: "education" | "subjects" | "goals" | "preferences" | "language" | "learning_style" | "interests" | "general";
+  /** 1–5: how useful long-term. */
+  importance: number;
+  value?: string;
+  createdAt: number;
+  updatedAt: number;
+  /** "auto" = OLIS saved it from a message; "manual" = the student added it. */
+  origin?: "auto" | "manual";
+}
+
+/** A message from an earlier chat, sent when the student refers back to it. */
+export interface RecallItem {
+  chat: string;
+  date: string;
+  role: "user" | "assistant";
+  text: string;
 }
 
 export interface AgentStep {
@@ -188,4 +215,6 @@ export interface Settings {
   context: LearningContext;
   profile: StudyProfile;
   noticeDismissed: boolean;
+  /** Let OLIS remember lasting facts across chats (Settings → OLIS Memory). */
+  memoryEnabled: boolean;
 }
