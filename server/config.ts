@@ -32,6 +32,8 @@ export function config() {
     model: env("GEMINI_MODEL", "gemini-3.5-flash-lite"),
     embedModel: env("GEMINI_EMBED_MODEL", "gemini-embedding-001"),
     tavilyKey: env("TAVILY_API_KEY"),
+    /** Optional CoinGecko demo key: live crypto prices work without it, the key only raises rate limits. */
+    coingeckoKey: env("COINGECKO_API_KEY"),
     tavilyBase: env("TAVILY_BASE_URL", "https://api.tavily.com").replace(/\/$/, ""),
     wikipediaBase: env("WIKIPEDIA_BASE_URL", "https://en.wikipedia.org").replace(/\/$/, ""),
     webScope: (env("WEB_SEARCH_SCOPE", "trusted") === "open" ? "open" : "trusted") as "open" | "trusted",

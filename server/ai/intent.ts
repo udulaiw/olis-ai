@@ -11,6 +11,8 @@
 import { guessTopic, guessSubject, subjectById, subjectAtLevel, strategyFor, STRATEGIES, type ExamLevel, type StrategyId, type SubjectTaxonomy } from "../knowledge/taxonomy.js";
 import { detectLanguage as detect, replyLanguage, expandQuery, resolveFollowUp, detectExamLevel, stripLanguageRequests } from "../lang/nlp.mjs";
 import type { Capability, Task } from "./types.js";
+import { detectLive, type LiveQuery } from "../live/detect.js";
+import { HISTORY_CUE, MEMORY_CUE } from "./cues.js";
 
 export type LanguagePref = "en" | "si" | "ta" | "auto";
 export type DetectedLanguage = "en" | "si" | "ta" | "singlish" | "mixed";
@@ -36,6 +38,7 @@ export type Intent =
   | "marking"
   | "practice"
   | "planning"
+  | "current_info"
   | "general";
 
 export type Difficulty = "beginner" | "intermediate" | "advanced" | "exam" | "challenge";
@@ -123,6 +126,12 @@ export interface Classification {
   requiresCalculation: boolean;
   requiresRetrieval: boolean;
   requiresCurrentInfo: boolean;
+  /** Needs a live source (price, rate, weather, news, scores, "latest X"). Model knowledge is never treated as current. */
+  live: LiveQuery | null;
+  /** The question is about what the student told OLIS before (saved memory). */
+  requiresMemory: boolean;
+  /** The question refers to an earlier conversation. */
+  requiresHistory: boolean;
   specialist: Specialist;
   /** English search terms found for a Sinhala / Singlish message. */
   terms: string[];
@@ -164,7 +173,10 @@ export function classifyRequest(input: {
   let subj: SubjectTaxonomy | undefined = topicGuess ? subjectById(topicGuess.subject) : (guessSubject(topicText, hint, examLevel) ?? undefined);
   if (subj) subj = subjectAtLevel(subj, examLevel);
 
-  const intent = intentOf(q, expansion.terms, input.mode, Boolean(input.attachmentChars));
+  // Live data first: "btc price eka dan kiyada" is a current-information question whatever else it looks like
+  const live = input.imageCount || input.attachmentChars ? null : detectLive(q, expansion.expanded);
+  const baseIntent = intentOf(q, expansion.terms, input.mode, Boolean(input.attachmentChars));
+  const intent: Intent = live && !["greeting", "translation", "marking", "past_paper", "correction"].includes(baseIntent) ? "current_info" : baseIntent;
   const mathy = MATH_SIGNS.test(q) || EQUATION.test(q);
   if (!subj && mathy && intent === "problem_solving") subj = mathsFallback(examLevel);
 
@@ -176,8 +188,12 @@ export function classifyRequest(input: {
   const numeric = NUM_WITH_UNIT.test(q) || /\d/.test(q);
   const requiresCalculation =
     intent === "problem_solving" && (mathy || numeric || ["mathematics", "physics", "chemistry"].includes(discipline)) && !["language", "history"].includes(discipline);
-  const requiresRetrieval = !["greeting", "planning", "translation"].includes(intent) && q.trim().length > 3;
-  const requiresCurrentInfo = CURRENT.test(q);
+  // Live questions are not in the study notes: skip the knowledge base for them (Performance: route, don't run everything)
+  const requiresRetrieval = !live && !["greeting", "planning", "translation"].includes(intent) && q.trim().length > 3;
+  const requiresCurrentInfo = Boolean(live) || CURRENT.test(q);
+  const requiresMemory = MEMORY_CUE.test(q) || intent === "planning";
+  // "who won yesterday's match" is about the world, not about our chats
+  const requiresHistory = !live && HISTORY_CUE.test(q);
   const difficulty = difficultyOf(q, intent, examLevel, input.mode, expansion.terms);
 
   const lv = examLevel === "OL" ? "ol" : examLevel === "AL" ? "al" : subj?.level === "OL" ? "ol" : subj?.level === "AL" ? "al" : "any";
@@ -199,6 +215,9 @@ export function classifyRequest(input: {
     requiresCalculation,
     requiresRetrieval,
     requiresCurrentInfo,
+    live,
+    requiresMemory,
+    requiresHistory,
     specialist,
     terms: expansion.terms,
     retrievalQuery: follow.isFollowUp ? follow.retrievalQuery : expansion.expanded,
@@ -234,7 +253,7 @@ export function classifyRequest(input: {
 /** Confidence label shown to the student, from retrieval evidence. Never "confident" without a verified OLIS source. */
 export type Confidence = "confident" | "likely" | "uncertain" | "insufficient_source";
 export function confidenceOf(grounding: "strong" | "weak" | "none" | undefined, intent: Intent): Confidence | null {
-  if (!grounding || intent === "greeting" || intent === "planning" || intent === "translation") return null;
+  if (!grounding || intent === "greeting" || intent === "planning" || intent === "translation" || intent === "current_info") return null;
   if (grounding === "strong") return "confident";
   if (grounding === "weak") return "likely";
   // No OLIS source: maths and pure reasoning can still be checked (math_check), syllabus facts can't

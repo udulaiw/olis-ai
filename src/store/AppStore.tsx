@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import type { Chat, EngineKind, LearningContext, Message, Mode, QuizProgress, Settings, StudyProfile } from "../types";
+import type { Chat, EngineKind, LearningContext, MemoryItem, Message, Mode, QuizProgress, Settings, StudyProfile } from "../types";
+import { findRecall } from "../lib/recall";
 import { KEYS, load, remove, save } from "../lib/storage";
 import { isAbort, titleFrom, uid } from "../lib/utils";
 import { OlisError, generateResponse, type EngineConfig } from "../services/olisEngine";
@@ -22,7 +23,18 @@ export const DEFAULT_SETTINGS: Settings = {
   context: { subject: "General", level: "Intermediate", style: "Detailed explanation" },
   profile: DEFAULT_PROFILE,
   noticeDismissed: false,
+  memoryEnabled: true,
 };
+
+const MAX_MEMORIES = 60;
+/** Keeps only well-formed saved memories (localStorage is user-editable). */
+function sanitizeMemories(v: unknown): MemoryItem[] {
+  if (!Array.isArray(v)) return [];
+  return v
+    .filter((m): m is MemoryItem => Boolean(m) && typeof m.key === "string" && typeof m.memory === "string" && m.memory.trim().length > 0)
+    .map((m) => ({ ...m, importance: Math.min(5, Math.max(1, Number(m.importance) || 3)), createdAt: Number(m.createdAt) || Date.now(), updatedAt: Number(m.updatedAt) || Date.now() }))
+    .slice(0, MAX_MEMORIES);
+}
 
 export type CloudStatus = "checking" | "ready" | "unavailable";
 
@@ -67,6 +79,13 @@ interface Store {
   stop: (chatId: string) => void;
   isBusy: (chatId: string) => boolean;
   updateQuiz: (chatId: string, msgId: string, progress: QuizProgress) => void;
+
+  /** What OLIS remembers about the student (this browser only). */
+  memories: MemoryItem[];
+  addMemory: (text: string) => void;
+  updateMemory: (key: string, text: string) => void;
+  removeMemory: (key: string) => void;
+  clearMemories: () => void;
 
   toasts: Toast[];
   toast: (text: string, kind?: ToastKind) => void;
@@ -182,6 +201,43 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     [dismissToast],
   );
 
+  // ── Long-term memory ─────────────────────────
+  const [memories, setMemories] = useState<MemoryItem[]>(() => sanitizeMemories(load<MemoryItem[]>(KEYS.memory, [])));
+  const memoriesRef = useRef(memories);
+  memoriesRef.current = memories;
+  useEffect(() => {
+    save(KEYS.memory, memories);
+  }, [memories]);
+  /** Insert or replace by key (a newer "exam" fact replaces the older one). Newest first, capped. */
+  const upsertMemories = useCallback((items: Omit<MemoryItem, "createdAt" | "updatedAt">[]) => {
+    const now = Date.now();
+    setMemories((cur) => {
+      const next = [...cur];
+      for (const it of items) {
+        const i = next.findIndex((m) => m.key === it.key);
+        if (i >= 0) next.splice(i, 1, { ...next[i], ...it, updatedAt: now });
+        else next.unshift({ ...it, createdAt: now, updatedAt: now, origin: it.origin ?? "auto" });
+      }
+      return next.slice(0, MAX_MEMORIES);
+    });
+  }, []);
+  const addMemory = useCallback(
+    (text: string) => {
+      const t = text.trim().slice(0, 200);
+      if (t) upsertMemories([{ key: `manual:${uid()}`, memory: t, category: "general", importance: 4, origin: "manual" }]);
+    },
+    [upsertMemories],
+  );
+  const updateMemory = useCallback((key: string, text: string) => {
+    const t = text.trim().slice(0, 200);
+    setMemories((cur) => (t ? cur.map((m) => (m.key === key ? { ...m, memory: t, updatedAt: Date.now(), origin: "manual" } : m)) : cur.filter((m) => m.key !== key)));
+  }, []);
+  const removeMemory = useCallback((key: string) => setMemories((cur) => cur.filter((m) => m.key !== key)), []);
+  const clearMemories = useCallback(() => {
+    setMemories([]);
+    remove(KEYS.memory);
+  }, []);
+
   // ── Chats ────────────────────────────────────
   const [chats, setChats] = useState<Chat[]>(() => sanitizeLoadedChats(load<Chat[]>(KEYS.chats, [])));
   const chatsRef = useRef(chats);
@@ -291,6 +347,12 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             context: settingsRef.current.context,
             history,
             signal: ctrl.signal,
+            memory: {
+              enabled: settingsRef.current.memoryEnabled !== false,
+              items: memoriesRef.current,
+              // Earlier chats are searched only when the question refers back to one ("continue that plan")
+              recall: settingsRef.current.memoryEnabled !== false ? findRecall(userMsg.content, chatsRef.current, chatId) : [],
+            },
           },
           { ...engineRef.current, kind },
         );
@@ -329,6 +391,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             patchMsg(chatId, assistantId, { sources: ev.sources });
           } else if (ev.type === "meta") {
             patchMsg(chatId, assistantId, { meta: ev.meta });
+          } else if (ev.type === "memory") {
+            if (settingsRef.current.memoryEnabled !== false && ev.saved.length) upsertMemories(ev.saved);
           } else if (ev.type === "suggestions") {
             patchMsg(chatId, assistantId, { suggestions: ev.items });
           } else if (ev.type === "quiz") {
@@ -358,7 +422,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         patchChat(chatId, (c) => ({ ...c, updatedAt: Date.now() }));
       }
     },
-    [patchMsg, patchChat],
+    [patchMsg, patchChat, upsertMemories],
   );
 
   const send = useCallback(
@@ -482,6 +546,11 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     stop,
     isBusy,
     updateQuiz,
+    memories,
+    addMemory,
+    updateMemory,
+    removeMemory,
+    clearMemories,
     toasts,
     toast,
     dismissToast,

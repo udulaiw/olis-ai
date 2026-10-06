@@ -15,7 +15,7 @@
 //   "demo"  → offline, $0, pattern-based engine (./demo), also the automatic
 //             fallback when the cloud is unreachable.
 // ─────────────────────────────────────────────
-import type { AnswerMeta, Difficulty, EngineKind, Flashcard, LearningContext, Mode, Quiz, Source, StudyPlan, StudyProfile, Subject } from "../types";
+import type { AnswerMeta, MemoryItem, RecallItem, Difficulty, EngineKind, Flashcard, LearningContext, Mode, Quiz, Source, StudyPlan, StudyProfile, Subject } from "../types";
 import { sleep } from "../lib/utils";
 import { detectIntent, type Intent } from "./intent";
 import { demoFlashcards, demoQuiz, demoRespond, detectSubject, type DemoOutput } from "./demo/demoEngine";
@@ -50,7 +50,9 @@ export type EngineEvent =
   | { type: "rewind"; to: number }
   | { type: "notice"; kind: "switching" }
   /** OLIS Cloud: detected subject / topic / confidence. */
-  | { type: "meta"; meta: AnswerMeta };
+  | { type: "meta"; meta: AnswerMeta }
+  /** OLIS Cloud: lasting facts to save in OLIS memory. */
+  | { type: "memory"; saved: Omit<MemoryItem, "createdAt" | "updatedAt">[] };
 
 export interface ResponseRequest {
   input: string;
@@ -62,6 +64,8 @@ export interface ResponseRequest {
   context: LearningContext;
   history: Turn[];
   signal?: AbortSignal;
+  /** Long-term memory and earlier-chat matches (OLIS Cloud only). */
+  memory?: { enabled: boolean; items: MemoryItem[]; recall: RecallItem[] };
 }
 
 export interface ToolResult<T> {
@@ -184,6 +188,10 @@ export async function* generateResponse(req: ResponseRequest, cfg: EngineConfig)
       mode: intent === "greeting" || intent === "thanks" || intent === "about" ? "ask" : (intent as Mode),
       context: req.context,
       profile: cfg.profile,
+      memoryEnabled: req.memory?.enabled ?? true,
+      // Only the fields the server needs; it picks the relevant few for each question
+      memories: req.memory?.enabled ? req.memory.items.slice(0, 50).map(({ key, memory, category, importance, value }) => ({ key, memory, category, importance, value })) : undefined,
+      recall: req.memory?.enabled && req.memory.recall.length ? req.memory.recall : undefined,
     },
     req.signal,
   )) {

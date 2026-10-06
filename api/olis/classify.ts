@@ -1,6 +1,6 @@
 // POST /api/olis/classify: what the OLIS subject router makes of a question, without answering it.
 //   body: { question, mode?, subject?, profile?, history? }
-// Returns labels only (subject, level, language, topic, intent, difficulty, requires_*).
+// Returns labels only (subject, level, language, topic, intent, difficulty, requires_web/rag/memory/history…).
 // No AI call is made, so this costs nothing; it shares the agent's origin check and rate limit.
 import { config } from "../../server/config.js";
 import { guard, json, errorJson } from "../../server/http.js";
@@ -40,6 +40,11 @@ export async function POST(request: Request): Promise<Response> {
     difficulty: c.difficulty,
     requires_calculation: c.requiresCalculation,
     requires_retrieval: c.requiresRetrieval,
+    requires_rag: c.requiresRetrieval,
+    requires_web: Boolean(c.live),
+    live_domain: c.live?.domain ?? null,
+    requires_memory: c.requiresMemory,
+    requires_history: c.requiresHistory,
     requires_current_info: c.requiresCurrentInfo,
     follow_up: c.followUp?.kind ?? null,
   });

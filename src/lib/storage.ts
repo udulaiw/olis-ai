@@ -30,4 +30,5 @@ export function remove(key: string) {
 export const KEYS = {
   chats: "olis.chats",
   settings: "olis.settings",
+  memory: "olis.memory",
 } as const;

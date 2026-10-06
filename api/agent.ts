@@ -5,6 +5,7 @@ import { runAgent, type AgentRequest } from "../server/agent.js";
 import { RouterExhausted, anyEngineConfigured } from "../server/ai/router.js";
 import { ProviderError } from "../server/ai/types.js";
 import { parseContext, parseImages, parseProfile, str } from "../server/sanitize.js";
+import { parseMemories } from "../server/memory.js";
 
 const MODES = new Set(["ask", "explain", "solve", "plan", "summarize", "simplify", "quiz"]);
 
@@ -29,6 +30,16 @@ function parse(body: unknown): AgentRequest | null {
     mode: MODES.has(String(b.mode)) ? String(b.mode) : "ask",
     context: parseContext(b.context),
     profile: parseProfile(b.profile),
+    memoryEnabled: b.memoryEnabled !== false,
+    memories: parseMemories(b.memories),
+    recall: Array.isArray(b.recall)
+      ? (b.recall as Record<string, unknown>[]).slice(0, 4).map((r) => ({
+          chat: str(r?.chat, 80).replace(/[<>]/g, " "),
+          date: str(r?.date, 20).replace(/[<>]/g, " "),
+          role: r?.role === "assistant" ? ("assistant" as const) : ("user" as const),
+          text: str(r?.text, 1200).replace(/<\/?(previous_conversations|user_memory|live_data|knowledge_excerpts)[^>]*>/gi, " "),
+        })).filter((r) => r.text.trim())
+      : undefined,
   };
 }
 

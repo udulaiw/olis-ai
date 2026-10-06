@@ -41,6 +41,9 @@ type Behaviour =
   | { kind: "json"; text: string };
 
 let behaviours: Record<string, Behaviour[]> = {}; // model id → queue (last one repeats)
+/** Live-data API mocks: host fragment → response (reset per test). Unlisted live hosts get 404 = "source down". */
+let liveMocks: Record<string, () => Response> = {};
+const liveHits: string[] = [];
 let calls: { model: string; body: Record<string, unknown> }[] = [];
 const logs: string[] = [];
 
@@ -77,7 +80,12 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     model = String(JSON.parse(String(init?.body ?? "{}")).model);
   } else if (url.includes("wikipedia.org")) {
     return new Response(JSON.stringify({ query: { pages: {} } }), { status: 200 });
-  } else return new Response("not mocked", { status: 404 });
+  } else {
+    const hit = Object.keys(liveMocks).find((h) => url.includes(h));
+    if (/coingecko|er-api|open-meteo|news\.google|tavily/.test(url)) liveHits.push(url);
+    if (hit) return liveMocks[hit]();
+    return new Response("not mocked", { status: 404 });
+  }
 
   calls.push({ model, body: JSON.parse(String(init?.body ?? "{}")) });
   const b = next(model);
@@ -120,6 +128,8 @@ function reset(env: Record<string, string> = {}) {
   for (const k of ["GEMINI_MODEL", "LOCAL_AI_BASE_URL", "UPSTASH_REDIS_REST_URL", "TAVILY_API_KEY"]) delete process.env[k];
   Object.assign(process.env, BASE_ENV, env);
   behaviours = {};
+  liveMocks = {};
+  liveHits.length = 0;
   calls = [];
   logs.length = 0;
   _resetHealth();
@@ -463,16 +473,121 @@ await test("26. marking mode: estimated-marks wording, never an official mark", 
   assert(sys.includes("# Marking mode") && sys.includes("Estimated based on the available marking scheme. This is not an official examination mark."), "marking rules missing");
 });
 
-await test("27. current information: model is told to cite source and year", async () => {
-  await readSSE(await agentPOST(apiRequest("/api/agent", agentBody("What is the current inflation rate in Sri Lanka?"))));
+await test("27. current information + live source down → no figure from memory", async () => {
+  const { events } = await readSSE(await agentPOST(apiRequest("/api/agent", agentBody("What is the current inflation rate in Sri Lanka?"))));
   const sys = sysOf();
-  assert(sys.includes("# Current information") && /accessed \d{4}-\d{2}-\d{2}/.test(sys), "current-info rule missing");
+  assert(sys.includes("current_data_available = false") && sys.includes("Do NOT state any current price"), "live-failure rule missing");
+  assert(events.some((e) => e.type === "step" && e.label === "Couldn't get live data right now"), "failed live step not shown");
 });
 
 await test("28. Tamil preference → Tamil reply rules, multilingual route", async () => {
   await readSSE(await agentPOST(apiRequest("/api/agent", agentBody("what is speed", { profile: { language: "ta" } }))));
   const sys = sysOf();
   assert(sys.includes("Reply in Tamil (Tamil script)") && sys.includes("Tamil Unicode"), "Tamil rules missing");
+});
+
+// ── Live data, memory, previous chats (spec scenarios 1–8) ──────────────────────
+/** The conversation the model received (not the system prompt, which names the blocks when explaining the rules). */
+const sent = () => JSON.stringify((calls.find((c) => c.model.startsWith("gemini"))!.body as { contents: unknown }).contents);
+const jsonRes = (o: unknown) => () => new Response(JSON.stringify(o), { status: 200, headers: { "content-type": "application/json" } });
+const now = Math.floor(Date.now() / 1000);
+const BTC = { bitcoin: { usd: 64321.5, lkr: 19234567, usd_24h_change: -1.234, last_updated_at: now - 60 } };
+type Ev = { type: string; label?: string; status?: string; meta?: Record<string, unknown>; saved?: { key: string; value?: string }[]; sources?: { url: string | null }[] };
+const evs = (e: unknown[]) => e as Ev[];
+
+await test("S1. normal question (Newton's second law) → no web / live call", async () => {
+  const { events } = await readSSE(await agentPOST(apiRequest("/api/agent", agentBody("What is Newton's second law?"))));
+  assert(liveHits.length === 0, `unexpected live call: ${liveHits[0]}`);
+  assert(!sent().includes("<live_data"), "live_data block sent");
+  assert(evs(events).some((e) => e.type === "step" && e.label === "Checking OLIS study notes"), "RAG not used");
+});
+
+await test("S2. 'What is Bitcoin price right now?' → CoinGecko, figure + timestamps, no RAG", async () => {
+  liveMocks["api.coingecko.com"] = jsonRes(BTC);
+  const { events } = await readSSE(await agentPOST(apiRequest("/api/agent", agentBody("What is Bitcoin price right now?"))));
+  const body = sent();
+  assert(liveHits.some((u) => u.includes("coingecko") && u.includes("ids=bitcoin")), "CoinGecko not called");
+  assert(body.includes('current_data_available=\\"true\\"') && body.includes("64321.5") && body.includes("retrieved_at"), "live block missing figure/timestamp");
+  assert(!evs(events).some((e) => e.type === "step" && e.label === "Checking OLIS study notes"), "RAG ran for a live question");
+  const meta = evs(events).find((e) => e.type === "meta")!.meta as { live?: { ok: boolean; source: string; dataTimestamp: string } };
+  assert(meta.live?.ok && meta.live.source === "CoinGecko" && meta.live.dataTimestamp, `meta.live=${JSON.stringify(meta.live)}`);
+  assert(evs(events).some((e) => e.type === "sources" && e.sources!.some((x) => x.url?.includes("coingecko.com"))), "no CoinGecko source card");
+});
+
+await test("S3. 'USD to LKR today?' → exchange-rate source, labelled as a daily rate", async () => {
+  liveMocks["open.er-api.com"] = jsonRes({ result: "success", time_last_update_unix: now - 3600 * 5, rates: { LKR: 300.1234, USD: 1 } });
+  await readSSE(await agentPOST(apiRequest("/api/agent", agentBody("USD to LKR today?"))));
+  const body = sent();
+  assert(liveHits.some((u) => u.includes("open.er-api.com/v6/latest/USD")), "FX API not called");
+  assert(body.includes("300.1234") && body.includes("daily mid-market reference rate"), "rate or daily caveat missing");
+});
+
+await test("S4. 'Explain electrolysis according to the O/L syllabus' → OLIS knowledge base, no live data", async () => {
+  const { events } = await readSSE(await agentPOST(apiRequest("/api/agent", agentBody("Explain electrolysis according to the O/L syllabus."))));
+  assert(evs(events).some((e) => e.type === "step" && e.label === "Checking OLIS study notes"), "RAG not used");
+  assert(liveHits.length === 0, "live call for a syllabus question");
+});
+
+await test("S5. memory: 'I prefer Sinhala explanations' is saved; next chat answers in Sinhala", async () => {
+  const first = await readSSE(await agentPOST(apiRequest("/api/agent", agentBody("I prefer Sinhala explanations."))));
+  const saved = evs(first.events).find((e) => e.type === "memory")?.saved ?? [];
+  assert(saved.some((m) => m.key === "language_pref" && m.value === "si"), `not saved: ${JSON.stringify(saved)}`);
+  assert(evs(first.events).some((e) => e.type === "step" && e.label?.startsWith("Saved to memory")), "no 'saved to memory' indicator");
+  reset();
+  // Conversation 2: a NEW chat, the browser sends what it saved
+  await readSSE(await agentPOST(apiRequest("/api/agent", agentBody("Explain photosynthesis", { memories: saved }))));
+  assert(sysOf().includes("Reply in Sinhala"), "Sinhala preference not applied");
+  assert(sent().includes("Prefers explanations in Sinhala"), "memory not given to the model");
+});
+
+await test("S5b. 'Today I studied for 2 hours' is NOT saved; memory off saves and uses nothing", async () => {
+  const a = await readSSE(await agentPOST(apiRequest("/api/agent", agentBody("Today I studied for 2 hours."))));
+  assert(!evs(a.events).some((e) => e.type === "memory"), "transient fact saved");
+  reset();
+  const b = await readSSE(await agentPOST(apiRequest("/api/agent", agentBody("I prefer Sinhala explanations.", { memoryEnabled: false, memories: [{ key: "exam", memory: "Preparing for the 2027 G.C.E. A/L examination.", category: "education", importance: 5 }] }))));
+  assert(!evs(b.events).some((e) => e.type === "memory"), "saved while memory is off");
+  assert(!sent().includes("<user_memory>"), "memory used while off");
+});
+
+await test("S6. 'Can you continue that plan?' → previous chat retrieved; nothing found → no fake continuity", async () => {
+  const recall = [{ chat: "Physics revision plan", date: "2026-10-01", role: "assistant", text: "Week 1: Mechanics (kinematics, Newton's laws). Week 2: Waves and optics. Week 3: Electricity." }];
+  const a = await readSSE(await agentPOST(apiRequest("/api/agent", agentBody("Can you continue that plan?", { recall }))));
+  assert(sent().includes("<previous_conversations>") && sent().includes("Week 2: Waves and optics"), "previous chat not given to the model");
+  assert(evs(a.events).some((e) => e.type === "step" && e.label?.startsWith("Using your previous chats")), "no indicator");
+  reset();
+  await readSSE(await agentPOST(apiRequest("/api/agent", agentBody("Can you continue that plan?"))));
+  assert(sysOf().includes("I don't have that previous detail available right now"), "no anti-fabrication rule when nothing matched");
+});
+
+await test("S7. Singlish 'Bitcoin price eka dan kiyada?' → live crypto data", async () => {
+  liveMocks["api.coingecko.com"] = jsonRes(BTC);
+  await readSSE(await agentPOST(apiRequest("/api/agent", agentBody("Bitcoin price eka dan kiyada?"))));
+  assert(liveHits.some((u) => u.includes("coingecko")), "CoinGecko not called for Singlish");
+  assert(sent().includes("64321.5"), "price not passed to the model");
+});
+
+await test("S8. 'What did I tell you about my favorite subject?' with nothing saved → don't invent", async () => {
+  await readSSE(await agentPOST(apiRequest("/api/agent", agentBody("What did I tell you about my favorite subject?"))));
+  assert(sysOf().includes("Nothing relevant is saved in OLIS memory") && sysOf().includes("I don't have that previous detail available right now"), "fake-memory rule missing");
+  assert(!sent().includes("<user_memory>"), "memory block without memories");
+});
+
+await test("S9. live source down → no figure, transparent failure; chat still answers", async () => {
+  liveMocks["api.coingecko.com"] = () => new Response("oops", { status: 500 });
+  const { events, text } = await readSSE(await agentPOST(apiRequest("/api/agent", agentBody("What is the current BTC price?"))));
+  assert(sysOf().includes("current_data_available = false") && sent().includes('current_data_available=\\"false\\"'), "failure not passed on");
+  assert(evs(events).some((e) => e.type === "step" && e.status === "failed"), "no failed step");
+  const meta = evs(events).find((e) => e.type === "meta")!.meta as { live?: { ok: boolean } };
+  assert(meta.live && !meta.live.ok, "meta.live should be ok:false");
+  assert(text.length > 0, "chat crashed");
+});
+
+await test("S10. news: Google News RSS headlines become cited sources", async () => {
+  const rss = `<rss><channel><item><title>NASA launches new Moon probe - Reuters</title><link>https://news.example.com/a</link><pubDate>${new Date(Date.now() - 7200e3).toUTCString()}</pubDate><source url="https://www.reuters.com">Reuters</source></item></channel></rss>`;
+  liveMocks["news.google.com"] = () => new Response(rss, { status: 200, headers: { "content-type": "application/rss+xml" } });
+  const { events } = await readSSE(await agentPOST(apiRequest("/api/agent", agentBody("Latest NASA news"))));
+  assert(sent().includes("NASA launches new Moon probe") && !sent().includes("Moon probe - Reuters"), "headline not parsed");
+  assert(evs(events).some((e) => e.type === "sources" && e.sources!.some((x) => x.url === "https://news.example.com/a")), "headline not a source");
 });
 
 // ── Report ─────────────────────────────────────

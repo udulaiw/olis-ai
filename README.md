@@ -135,12 +135,20 @@ OLIS serves both G.C.E. O/L and A/L students. The language layer (`server/lang/`
 grounding rules, PDF ingest and the evaluation suite are described in **`docs/ol-al-upgrade.md`**.
 
 ```
-npm test            # existing agent tests + language/Unicode tests + offline retrieval eval
+npm test            # agent tests + language/router/memory tests + retrieval eval + plain-Node route check
 npm run test:lang   # Sinhala Unicode, language detection, Singlish expansion, maths tool
 npm run eval        # retrieval / no-source / level-isolation metrics with regression floors
 npm run eval:live   # against a running OLIS with real model keys (not part of npm test)
 npm run ingest -- <folder|pdf|zip> --level ol --subject "Science"
 ```
+
+## Live data, memory and earlier chats
+
+OLIS answers current questions (Bitcoin price, USD→LKR, weather, news, "latest X") from live sources with the source and
+data time shown, and never invents a figure when a source is down. It remembers lasting facts the student mentions (exam,
+stream, subjects, language preference, goals) in their browser, uses only the relevant ones, and lets them edit or clear them
+in **Settings → OLIS Memory**. "Continue the plan we made" searches their earlier chats. No new keys needed.
+Details: **[docs/live-data-and-memory.md](docs/live-data-and-memory.md)**.
 
 ## Subjects, router and answer strategies
 
@@ -173,7 +181,7 @@ Every AI call logs one JSON line (Vercel → Logs):
 
 Never logged: API keys (also redacted from provider error text), prompts, answers, profiles. Feedback logs keep only short excerpts (the full text goes to your webhook, if set).
 
-**Provider health:** set `OLIS_ADMIN_TOKEN`. In Settings, tap the **v0.4 · beta** label 5 times to reveal *Developer: AI engine health* (hidden from students), enter the token, and press **Test all** to send one tiny request to every configured engine: the quickest way to confirm a new key (e.g. NVIDIA) works. Same data: `GET /api/health?detail=1&probe=1` with header `x-olis-admin`. Without a valid token the endpoint answers 404, and the public `/api/health` returns only `{ok, busy}`.
+**Provider health:** set `OLIS_ADMIN_TOKEN`. In Settings, tap the **v0.5 · beta** label 5 times to reveal *Developer: AI engine health* (hidden from students), enter the token, and press **Test all** to send one tiny request to every configured engine: the quickest way to confirm a new key (e.g. NVIDIA) works. Same data: `GET /api/health?detail=1&probe=1` with header `x-olis-admin`. Without a valid token the endpoint answers 404, and the public `/api/health` returns only `{ok, busy}`.
 
 ## Security
 

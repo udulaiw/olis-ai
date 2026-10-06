@@ -6,6 +6,7 @@ import { AIcon, HoverAnimate } from "../components/AnimatedIcon";
 import { Icon, type IconName } from "../components/Icon";
 import { cx } from "../lib/utils";
 import { StudyProfileEditor } from "../components/StudyProfile";
+import { MemoryPanel } from "../components/MemoryPanel";
 import { lazy, Suspense } from "react";
 // Admin-only: not downloaded unless unlocked
 const DeveloperPanel = lazy(() => import("../components/DeveloperPanel").then((m) => ({ default: m.DeveloperPanel })));
@@ -60,7 +61,7 @@ export function SettingsView() {
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6 sm:py-14">
-      <PageHeader eyebrow="Settings" title="Settings" subtitle="Your chats, settings and study profile stay in this browser. No account needed." />
+      <PageHeader eyebrow="Settings" title="Settings" subtitle="Your chats, settings, study profile and OLIS memory stay in this browser. No account needed." />
 
       <div className="space-y-4">
         <Section title="Appearance" desc="Dark mode is designed for long, calm study sessions.">
@@ -79,6 +80,10 @@ export function SettingsView() {
 
         <Section title="Study profile" desc="Tell OLIS how you learn. It uses this to pitch explanations and focus on the topics you find hard.">
           <StudyProfileEditor />
+        </Section>
+
+        <Section title="OLIS Memory" desc="What OLIS remembers about you between chats. You're in control: edit, delete or turn it off at any time.">
+          <MemoryPanel />
         </Section>
 
         <Section title="Intelligence engine" desc="What powers OLIS. OLIS Beta is free to use, and API keys stay on the server, never in your browser.">
@@ -134,7 +139,7 @@ export function SettingsView() {
               {cloud.status === "ready"
                 ? cloud.health?.busy
                   ? "Busy right now (free beta limits). Try again in a minute."
-                  : "Answers use OLIS study notes, Wikipedia and trusted sites, with sources. If one AI engine is busy, OLIS switches automatically."
+                  : "Answers use OLIS study notes, Wikipedia, trusted sites and live data (prices, exchange rates, weather, news), with sources. If one AI engine is busy, OLIS switches automatically."
                 : cloud.status === "unavailable"
                   ? "OLIS Cloud isn't available right now, so OLIS is using its offline engine."
                   : "Checking…"}
@@ -183,7 +188,7 @@ export function SettingsView() {
                 }
               }}
             >
-              v0.4 · beta
+              v0.5 · beta
             </button>
           </div>
           <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface-2 px-4 py-3">
