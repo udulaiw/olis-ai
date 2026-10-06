@@ -8,7 +8,7 @@ import { Icon, OlisMark } from "./Icon";
 import { AIcon, HoverAnimate } from "./AnimatedIcon";
 import { Orb, orbForMode, orbForStep } from "./Orb";
 import { copyText, cx } from "../lib/utils";
-import { AgentSteps, SourceList } from "./Sources";
+import { AgentSteps, AnswerInsight, SourceList } from "./Sources";
 
 interface Props {
   chatId: string;
@@ -108,6 +108,8 @@ export const MessageItem = memo(function MessageItem({ chatId, msg, isLastAssist
         )}
 
         {msg.sources && msg.sources.length > 0 && done && <SourceList sources={msg.sources} className="mt-4" />}
+
+        {msg.meta && done && msg.status !== "error" && <AnswerInsight meta={msg.meta} sources={msg.sources} className="mt-3" />}
 
         {msg.status === "error" && (
           <div className="mt-2 rounded-2xl border border-danger/25 bg-danger-soft px-4 py-3 text-sm" role="alert">

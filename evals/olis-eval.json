@@ -655,6 +655,32 @@
       "note": "untagged notes stay visible to both levels"
     }
   ],
+  "_router_note": "Subject-router cases (server/ai/intent.ts). `want` lists only the fields that matter for each case. `examLevel` / `pref` simulate the saved study profile.",
+  "router": [
+    {"q": "Explain monsoon rainfall in Sri Lanka", "examLevel": "AL", "want": {"subject": "geography", "level": "AL", "language": "en", "topic": "geo-climatology", "intent": "concept_explanation", "requiresRetrieval": true}, "note": "spec §7 example 1"},
+    {"q": "විද්‍යුත් ධාරාව කියන්නේ මොකක්ද?", "want": {"discipline": "physics", "language": "si", "reply": "si", "intent": "definition"}, "note": "spec §7 example 2 (a 'what is X' question; definition is the finer label)"},
+    {"q": "Solve 2x² - 5x - 3 = 0", "want": {"discipline": "mathematics", "intent": "problem_solving", "requiresCalculation": true}, "note": "spec §7 example 3: no subject word, maths detected from the equation"},
+    {"q": "Explain the causes of monsoon rainfall in Sri Lanka in Sinhala according to the A/L Geography syllabus.", "want": {"subject": "geography", "level": "AL", "reply": "si", "topic": "geo-climatology", "intent": "concept_explanation", "difficulty": "exam"}, "note": "spec §31 final quality standard; 'in Sinhala' must not route to the Sinhala-language subject"},
+    {"q": "Solve this A/L Physics question. A car accelerates from 10 m/s to 30 m/s in 4 s. Find the acceleration.", "want": {"subject": "physics", "level": "AL", "intent": "problem_solving", "requiresCalculation": true}, "note": "spec §31 physics pipeline"},
+    {"q": "Correct this Sinhala essay: මම ඊයේ පාසල් ගියා.", "want": {"discipline": "language", "intent": "correction"}, "note": "spec §31 Sinhala language pipeline"},
+    {"q": "Explain photosynthesis like I'm new to biology.", "want": {"subject": "biology", "intent": "concept_explanation", "difficulty": "beginner"}, "note": "spec §17 adaptive difficulty"},
+    {"q": "Compare the Anuradhapura and Polonnaruwa kingdoms", "want": {"discipline": "history", "intent": "comparison"}},
+    {"q": "Explain supply and demand", "want": {"subject": "economics", "topic": "econ-micro"}},
+    {"q": "What is the current inflation rate in Sri Lanka?", "want": {"subject": "economics", "requiresCurrentInfo": true}, "note": "current info, and 'current' must not route to electric current"},
+    {"q": "What is electric current?", "want": {"discipline": "physics", "requiresCurrentInfo": false}},
+    {"q": "Is this argument valid: all men are mortal, Socrates is a man, so Socrates is mortal", "want": {"subject": "logic", "intent": "problem_solving"}},
+    {"q": "Write a python program to find the largest number in a list", "examLevel": "AL", "want": {"subject": "al-ict", "discipline": "ict"}},
+    {"q": "What are the four noble truths?", "examLevel": "AL", "want": {"subject": "buddhism", "discipline": "religion"}},
+    {"q": "இயற்பியலில் வேகம் என்றால் என்ன?", "want": {"subject": "physics", "language": "ta", "reply": "ta"}, "note": "Tamil inflected subject name (இயற்பியல் → இயற்பியலில்)"},
+    {"q": "Explain monsoon rainfall in Sri Lanka", "examLevel": "OL", "want": {"subject": "ol-geography", "level": "OL"}, "note": "level picks the O/L twin"},
+    {"q": "Give me a Physics question about waves.", "want": {"subject": "physics", "intent": "practice"}},
+    {"q": "Find 2022 Chemistry questions about organic chemistry.", "want": {"subject": "chemistry", "topic": "organic", "intent": "past_paper"}},
+    {"q": "How many marks would I get for this answer: momentum is mass times velocity", "want": {"intent": "marking", "difficulty": "exam"}},
+    {"q": "Translate 'the cat sat on the mat' into Tamil", "want": {"intent": "translation", "requiresRetrieval": false}},
+    {"q": "hi", "want": {"intent": "greeting", "requiresRetrieval": false, "subject": null}},
+    {"q": "Make me a study plan for 2 weeks", "want": {"intent": "planning", "requiresRetrieval": false}},
+    {"q": "what is speed", "pref": "ta", "want": {"reply": "ta"}, "note": "saved Tamil preference"}
+  ],
   "live": [
     {
       "id": "si-speed",

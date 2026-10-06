@@ -16,12 +16,13 @@ export interface LearningContext {
   style: LearningStyle;
 }
 
-/** Answer language. "auto" = match whatever the student writes (English, Sinhala or Singlish). */
-export type Language = "auto" | "en" | "si";
+/** Answer language. "auto" = match whatever the student writes (English, Sinhala, Tamil or Singlish). */
+export type Language = "auto" | "en" | "si" | "ta";
 export const LANGUAGES: { id: Language; label: string }[] = [
   { id: "auto", label: "Auto" },
   { id: "en", label: "English" },
   { id: "si", label: "සිංහල" },
+  { id: "ta", label: "தமிழ்" },
 ];
 
 export type Depth = "quick" | "standard" | "deep";
@@ -122,6 +123,18 @@ export interface Source {
   snippet: string;
 }
 
+/** What OLIS understood the question to be (OLIS Cloud), shown under the answer. */
+export interface AnswerMeta {
+  subject: string | null;
+  subjectName: string | null;
+  topic: string | null;
+  level: "OL" | "AL" | null;
+  intent: string;
+  reply: string;
+  /** confident = matched a verified OLIS source; insufficient_source = nothing in OLIS confirms it. */
+  confidence: "confident" | "likely" | "uncertain" | "insufficient_source" | null;
+}
+
 export interface AgentStep {
   id: string;
   label: string;
@@ -146,6 +159,8 @@ export interface Message {
   steps?: AgentStep[];
   /** Sources the answer can cite as [n] */
   sources?: Source[];
+  /** Subject / topic / confidence OLIS detected (OLIS Cloud) */
+  meta?: AnswerMeta;
   /** Which engine produced this answer */
   engine?: EngineKind;
   feedback?: "up" | "down";

@@ -46,7 +46,7 @@ export async function generate(cfg: Config, req: GenerateRequest, signal?: Abort
   const level = detectExamLevel({ question: topic, stream: req.profile?.stream, examLevel: req.profile?.examLevel, subject: req.subject ?? req.context.subject });
   const levelName = level === "OL" ? "O/L (Grades 10–11)" : "A-Level";
   const { block, sources } = await grounding(cfg, topic, req.subject, level, signal);
-  const system = systemPrompt(req.context, "quiz", { tools: false, webSearch: false, profile: req.profile, examLevel: level, reply: req.profile?.language === "si" ? "si_mixed" : "en" });
+  const system = systemPrompt(req.context, "quiz", { tools: false, webSearch: false, profile: req.profile, examLevel: level, reply: req.profile?.language === "si" ? "si_mixed" : req.profile?.language === "ta" ? "ta" : "en" });
   const common = { task: "structured" as const, required: [], signal, deadline: Date.now() + cfg.generateDeadlineMs, requestId: newRequestId(), route: "generate", system };
   const lang = req.profile?.language === "si" ? " Write the questions and explanations in Sinhala, keeping technical terms in English." : "";
 

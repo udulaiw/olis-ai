@@ -183,7 +183,7 @@ export function SettingsView() {
                 }
               }}
             >
-              v0.3 · beta
+              v0.4 · beta
             </button>
           </div>
           <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface-2 px-4 py-3">

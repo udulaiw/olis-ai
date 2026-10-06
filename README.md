@@ -13,10 +13,11 @@ OLIS is a research agent for learning. It checks a curated knowledge base (notes
 Browser (React, no keys)          Vercel Functions (/api)                         AI engines (free tier)
 ────────────────────────          ───────────────────────                         ──────────────────────
 Chat / Tools / Settings ─POST─▶  /api/agent ─▶ guard ─▶ classify ─▶ RAG ─▶ AI router ─┬─▶ Google Gemini (primary)
-   language · profile    ◀─SSE─   steps, sources, text, rewind, notice               ├─▶ NVIDIA (optional)
+   language · profile    ◀─SSE─   steps, sources, text, rewind, notice, meta         ├─▶ NVIDIA (optional)
    photos (downsized)             /api/generate  quiz & flashcards (JSON, same router) └─▶ Local model (dev only)
                                   /api/health    public {ok,busy} only · ?detail=1 admin health (404 without token)
                                   /api/feedback  👍/👎 → logs / webhook
+                                  /api/subjects  public subject registry · /api/olis/classify  router labels only
 ```
 
 Full routing details: **[docs/ai-architecture.md](docs/ai-architecture.md)**.
@@ -27,10 +28,11 @@ server/
   ai/                     ◀ multi-provider AI layer
     models.config.ts        ★ models, routes per task, Free Beta allowlist
     router.ts               fallback, retries, timeouts
-    intent.ts               task + language (Sinhala / Singlish) detection
+    intent.ts               subject router: subject, level, language, intent, difficulty, requires_*
     classify.ts policy.ts health.ts store.ts log.ts status.ts types.ts
     providers/              gemini.ts · openai-compatible.ts (NVIDIA, Local) · index.ts
-  knowledge/taxonomy.ts   A/L topic map (provisional, for routing & tagging)
+  knowledge/subjects.json ★ subject registry: subjects, units, aliases, answer strategies (edit to add a subject)
+  knowledge/taxonomy.ts   loads and queries the registry
   agent.ts                research loop (tools, citations, streaming fallback)
   generate.ts             quiz / flashcards
   prompts.ts              persona, language, profile, A/L + past-paper rules
@@ -140,12 +142,21 @@ npm run eval:live   # against a running OLIS with real model keys (not part of n
 npm run ingest -- <folder|pdf|zip> --level ol --subject "Science"
 ```
 
-## Sri Lankan A/L knowledge
+## Subjects, router and answer strategies
 
-- `server/knowledge/taxonomy.ts`: a **provisional** topic map for Combined Maths, Physics and Chemistry, used for routing, tagging and "what topic is this testing?". Units are marked `verified: false` until checked against the NIE syllabus.
+28 O/L and A/L subjects (Maths, Science, ICT, Geography, History, Economics, Political Science, Logic, Sinhala, English, Tamil,
+Buddhism, Civics, Commerce, Study Skills…) live in **`server/knowledge/subjects.json`**. Adding a subject is a JSON edit. Every
+question is classified (subject · level · language · topic · intent · difficulty · needs calculation / sources / current info),
+answered with that subject's method (e.g. physics: knowns → law → equation → substitution → units → sanity check), and shown
+with a one-line footer: *Geography · Climatology · A/L · 2 OLIS sources · Confidence: High*. Marking mode always says the result
+is an estimate, not an official mark. Details: **[docs/subject-architecture.md](docs/subject-architecture.md)**.
+
+## Sri Lankan O/L and A/L knowledge
+
+- `server/knowledge/subjects.json`: the **provisional** topic map, used for routing, tagging and "what topic is this testing?". Units are marked `verified: false` until checked against the NIE syllabus.
 - `knowledge/syllabus/`: put official syllabus text here (empty on purpose: OLIS doesn't ship syllabus facts it hasn't verified).
 - `knowledge/past-papers/`: one real question per file with year, paper, question number, unit, difficulty and marking scheme. Copy `_TEMPLATE.md`. OLIS searches these with `search_past_papers` and **never invents** past-paper questions or marking schemes. "Similar questions" are labelled as OLIS practice questions.
-- Sinhala: answers in natural Sinhala with English technical terms (Integration, Momentum, Mole…). Understands Sinhala script, Singlish and mixed input. Language picker: Auto / English / සිංහල.
+- Sinhala: answers in natural Sinhala with English technical terms (Integration, Momentum, Mole…). Understands Sinhala script, Singlish and mixed input. Language picker: Auto / English / සිංහල / தமிழ்.
 
 ## Student personalisation
 
@@ -162,7 +173,7 @@ Every AI call logs one JSON line (Vercel → Logs):
 
 Never logged: API keys (also redacted from provider error text), prompts, answers, profiles. Feedback logs keep only short excerpts (the full text goes to your webhook, if set).
 
-**Provider health:** set `OLIS_ADMIN_TOKEN`. In Settings, tap the **v0.3 · beta** label 5 times to reveal *Developer: AI engine health* (hidden from students), enter the token, and press **Test all** to send one tiny request to every configured engine: the quickest way to confirm a new key (e.g. NVIDIA) works. Same data: `GET /api/health?detail=1&probe=1` with header `x-olis-admin`. Without a valid token the endpoint answers 404, and the public `/api/health` returns only `{ok, busy}`.
+**Provider health:** set `OLIS_ADMIN_TOKEN`. In Settings, tap the **v0.4 · beta** label 5 times to reveal *Developer: AI engine health* (hidden from students), enter the token, and press **Test all** to send one tiny request to every configured engine: the quickest way to confirm a new key (e.g. NVIDIA) works. Same data: `GET /api/health?detail=1&probe=1` with header `x-olis-admin`. Without a valid token the endpoint answers 404, and the public `/api/health` returns only `{ok, busy}`.
 
 ## Security
 
@@ -213,7 +224,8 @@ Without a key, OLIS runs on its offline engine.
 
 - Health and limits are per server instance unless Upstash is configured.
 - NVIDIA/Local models answer without live tool calls (notes are pre-fetched).
-- The A/L taxonomy is provisional and the past-paper / syllabus folders start empty.
+- The subject registry is provisional and the past-paper / syllabus folders start empty.
+- Tamil questions are routed and answered in Tamil, but retrieval has no Tamil glossary yet.
 - Photos are sent for the current session only; history keeps a small thumbnail.
 - Chat history and the study profile live in the browser (no accounts yet).
 

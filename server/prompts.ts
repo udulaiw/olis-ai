@@ -10,8 +10,8 @@
 // Edit this file to change how OLIS teaches.
 // ─────────────────────────────────────────────
 
-import { taxonomyPromptBlock, type ExamLevel } from "./knowledge/taxonomy.js";
-import type { ReplyLanguage, Specialist } from "./ai/intent.js";
+import { taxonomyPromptBlock, subjectById, STRATEGIES, type ExamLevel } from "./knowledge/taxonomy.js";
+import type { Difficulty, Intent, ReplyLanguage, Specialist } from "./ai/intent.js";
 import type { Grounding } from "./rag.js";
 
 export interface LearningContext {
@@ -24,7 +24,7 @@ export interface LearningContext {
 export interface StudentProfile {
   stream?: string;
   subjects?: string[];
-  language?: "en" | "si" | "auto";
+  language?: "en" | "si" | "ta" | "auto";
   depth?: "quick" | "standard" | "deep";
   currentTopic?: string;
   weakTopics?: string[];
@@ -50,6 +50,14 @@ export interface PromptOptions {
   followUpHint?: string;
   /** Extra rule added when a previous attempt produced text in the wrong script. */
   scriptRetry?: boolean;
+  /** Router output (server/ai/intent.ts). All optional so older callers keep working. */
+  subjectId?: string | null;
+  discipline?: string;
+  intent?: Intent;
+  difficulty?: Difficulty;
+  requiresCurrentInfo?: boolean;
+  /** Today's date (YYYY-MM-DD), for "accessed" lines on current-information sources. */
+  today?: string;
 }
 
 const DEPTH: Record<string, string> = {
@@ -65,15 +73,23 @@ function languageRules(reply: ReplyLanguage = "en", pref: StudentProfile["langua
       : reply === "si_mixed"
         ? `The student wrote Sinhala mixed with English (or Singlish). Answer in Sinhala script and keep English technical terms in English, the way Sri Lankan teachers speak in class.`
         : reply === "ta"
-          ? `The student wrote in Tamil. Answer in Tamil only if you can do it accurately, keeping technical terms in English; if you are not confident, answer in English and say so in one line.`
+          ? `Reply in Tamil (Tamil script), the Sri Lankan Tamil used in schools. Keep technical terms in English where classes use them, with the Tamil term in brackets only when you are sure of it. If you cannot answer accurately in Tamil, answer in English and say so in one line.`
           : `Reply in English.`;
-  const why = pref === "auto" ? `The student's message decides the language; if they ask for another ("සිංහලෙන්", "in English"), switch and keep the same content.` : `The student's saved preference is ${pref === "si" ? "Sinhala" : "English"}; an explicit request in their message ("in English", "සිංහලෙන්") overrides it.`;
+  const prefName = pref === "si" ? "Sinhala" : pref === "ta" ? "Tamil" : "English";
+  const why = pref === "auto" ? `The student's message decides the language; if they ask for another ("සිංහලෙන්", "in English", "தமிழில்"), switch and keep the same content.` : `The student's saved preference is ${prefName}; an explicit request in their message ("in English", "සිංහලෙන්", "in Tamil") overrides it.`;
   return [
     `# Language`,
     first,
     why,
     `Students type fast and loose: "krnna", "wla", "kmd", mixed scripts, missing letters. Read generously. Don't correct their spelling and don't comment on it.`,
-    ...(reply === "en"
+    ...(reply === "ta"
+      ? [
+          `When writing Tamil:`,
+          `- Use ONLY Tamil Unicode (U+0B80–U+0BFF) for Tamil. Never mix in Devanagari or Sinhala letters.`,
+          `- Maths stays in LaTeX; units stay SI symbols; numbers stay as digits.`,
+        ]
+      : []),
+    ...(reply === "en" || reply === "ta"
       ? []
       : [
           `When writing Sinhala:`,
@@ -87,16 +103,40 @@ function languageRules(reply: ReplyLanguage = "en", pref: StudentProfile["langua
   ].join("\n");
 }
 
-const SPECIALISTS: Record<string, string> = {
-  "ol-mathematics": `You are acting as the O/L Mathematics tutor. O/L marking rewards method: write the formula, the substitution, the working, and the answer with units. Use O/L methods only (no calculus). Check the answer by substituting back.`,
-  "ol-science": `You are acting as the O/L Science tutor (Physics, Chemistry and Biology topics). Use the standard textbook wording for definitions, state units, and connect ideas to everyday examples. Keep to Grade 10–11 depth.`,
-  "ol-ict": `You are acting as the O/L ICT tutor. Be precise with terms (hardware vs software, binary arithmetic, algorithm steps). For algorithms and programs show the trace table or the output.`,
-  "ol-language": `You are acting as the O/L English / Sinhala language tutor. Correct grammar kindly, give a model sentence or paragraph, and show the structure of essays and letters. For literature, only discuss texts or passages the student gives you or that appear in the excerpts.`,
-  "ol-humanities": `You are acting as the O/L tutor for History, Geography, Commerce, Health or Religion. Give structured answers (point, explanation, example). Dates, names, places and figures must come from the excerpts or be things you are certain of; otherwise say you cannot confirm them.`,
-  "al-mathematics": `You are acting as the A/L Combined Mathematics tutor (Pure and Applied). Show full working, name the theorem or identity you use, and verify results by substitution or an independent method. Use the math_check tool for arithmetic, derivatives and numeric integrals.`,
-  "al-physics": `You are acting as the A/L Physics tutor. State the principle first, define every symbol, check units and dimensions, and say which assumptions you made. Use the math_check tool for numeric work.`,
-  "al-chemistry": `You are acting as the A/L Chemistry tutor. Balance equations, state conditions and observations, and keep mole calculations explicit (n = m/M, c = n/V). For organic mechanisms name each step. Use the math_check tool for numeric work.`,
-  "past-paper": `You are acting as the Past Paper Analyst. Only quote questions, years, question numbers, marks and marking schemes that appear in search_past_papers results or the excerpts. Describe how marks are awarded only when a marking scheme is present. Do not claim trends unless several indexed papers support them.`,
+// Answer methods per subject come from the registry (server/knowledge/subjects.json → "strategies" and each subject's "prompt").
+const LEVEL_NOTE: Record<string, string> = {
+  "ol-mathematics": "O/L: no calculus.",
+  "ol-physics": "O/L: Grade 10–11 depth; no calculus.",
+  "ol-chemistry": "O/L: Grade 10–11 depth; no reaction mechanisms.",
+  "ol-biology": "O/L: Grade 10–11 depth and terminology.",
+};
+
+function strategyBlock(discipline: string | undefined, subjectId: string | null | undefined, level: ExamLevel | null | undefined): string {
+  const subj = subjectById(subjectId ?? undefined);
+  const strat = STRATEGIES[discipline ?? ""] ?? undefined;
+  const lines = [
+    subj ? `You are acting as the ${subj.name} tutor.` : "",
+    strat?.prompt ?? "",
+    subj?.prompt ?? "",
+    LEVEL_NOTE[`${(level ?? subj?.level ?? "").toLowerCase()}-${discipline}`] ?? "",
+  ].filter(Boolean);
+  return lines.length ? [`# Subject method`, ...lines].join("\n") : "";
+}
+
+const PIPELINES: Partial<Record<Intent, string>> = {
+  past_paper: `# Past-paper request\nYou are acting as the Past Paper Analyst. Call search_past_papers first. Only quote questions, years, question numbers, marks and marking schemes that appear in its results or the excerpts. Describe how marks are awarded only when a marking scheme is present. Don't claim trends unless several indexed papers support them. If nothing is indexed, say so and offer an OLIS practice question instead.`,
+  marking: `# Marking mode\nThe student wants their answer marked.\n1. Restate in one line what the question asks.\n2. List the points a marker expects: from a marking scheme in the excerpts or search_past_papers if there is one (call search_past_papers first), otherwise from your own knowledge, clearly labelled as OLIS's own checklist.\n3. Compare the student's answer point by point (✓ / partly / ✗).\n4. Give an estimated mark only if the question's total marks are known; otherwise a qualitative grade.\n5. Always state, on its own line: "Estimated based on the available marking scheme. This is not an official examination mark." (if no marking scheme was found: "Estimated by OLIS without an official marking scheme. This is not an official examination mark."). Never present the result as an official mark.\n6. Finish with exactly what to add or change to gain the missing marks.`,
+  practice: `# Practice questions\nFirst try search_past_papers for real questions on this topic and quote them with year, paper and question number. Where none are indexed, write NEW questions and label each "OLIS practice question (not from a past paper)". Put answers after the questions (or hold them back if the student wants to try first).`,
+  correction: `# Correction\nUse the correction order from the subject method (your version → corrected version → why → stronger alternative). Correct only real errors; keep the student's meaning and voice.`,
+  comparison: `# Comparison\nAnswer with a table of the points of comparison (same criteria for each side), then a short conclusion.`,
+  translation: `# Translation\nTranslate faithfully, keeping meaning and register. Keep technical terms that classes use in English. Add a one-line note only where a word has no exact equivalent.`,
+};
+
+const DIFFICULTY: Partial<Record<Difficulty, string>> = {
+  beginner: "Pitch: beginner. Start with an everyday analogy, explain every technical word, short sentences, no derivations.",
+  advanced: "Pitch: advanced. Full rigour: derivations, conditions and edge cases.",
+  exam: "Pitch: exam. Stay inside the syllabus, use the wording and keywords markers look for, structure the answer like a model answer, and add one exam tip.",
+  challenge: "Pitch: challenge. Give a harder extension and hints before the full solution.",
 };
 
 function levelBlock(level: ExamLevel | null | undefined): string {
@@ -199,17 +239,24 @@ export function systemPrompt(ctx: LearningContext, mode: string, opts: PromptOpt
     ``,
     `# Sri Lankan O/L and A/L`,
     `OLIS's topic map (provisional; organised by common O/L and A/L units, not the official syllabus wording):`,
-    taxonomyPromptBlock(undefined, opts.examLevel),
+    taxonomyPromptBlock(undefined, opts.examLevel, opts.subjectId ?? undefined),
     levelBlock(opts.examLevel),
-    opts.specialist && SPECIALISTS[opts.specialist] ? SPECIALISTS[opts.specialist] : "",
     `- "What topic is this testing?": name the subject and unit from this map, the specific skill tested, and the key formulae. Say it's OLIS's topic map if the student needs the official syllabus reference.`,
     `- Never state syllabus facts, unit numbers, mark allocations or exam rules you aren't given. If unsure, say so.`,
+    `- ACCURACY: never invent textbook content, page numbers, sources, quotations or statistics, and never claim something is in the syllabus without an excerpt that says so. Keep facts and your own explanation distinguishable.`,
     `- MARKING: when a marking scheme is in the excerpts, use it and say so. Never invent marking criteria or mark allocations.`,
     `- PAST PAPERS: only quote past-paper questions, years, question numbers and marking schemes that appear in the provided excerpts or search_past_papers results. Never invent or "recall" them. If none are available, say so honestly.`,
     `- "Give me a similar question": write a NEW question and label it "OLIS practice question (not from a past paper)".`,
     `- "Common mistakes": use marking-scheme sources if provided; otherwise present them as common mistakes tutors see, not as official examiner comments.`,
     `- "Don't give me the answer yet" / "just a hint" / "hint එකක් දෙන්න": give ONLY the next step or a guiding question. Don't reveal the final answer until the student asks for it.`,
     `Politely decline anything harmful or inappropriate for students.`,
+    ``,
+    strategyBlock(opts.discipline, opts.subjectId, opts.examLevel),
+    (opts.intent && PIPELINES[opts.intent]) || (opts.specialist === "past-paper" ? PIPELINES.past_paper : ""),
+    opts.difficulty && DIFFICULTY[opts.difficulty] ? `# Difficulty\n${DIFFICULTY[opts.difficulty]}` : "",
+    opts.requiresCurrentInfo
+      ? `# Current information\nThis asks about something that changes over time. Don't rely on textbook figures: ${opts.webSearch ? "use search_web (or search_wikipedia)" : "use search_wikipedia"} and give the source and the year of each figure${opts.today ? `, e.g. "Source: <organisation or site>, accessed ${opts.today}"` : ""}. If you can't confirm a current figure, give the latest one you are sure of with its year and say it may have changed.`
+      : "",
     ``,
     `# The student`,
     `Subject: ${ctx.subject} · Level: ${ctx.level} · Preferred style: ${ctx.style}.`,

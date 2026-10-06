@@ -27,6 +27,10 @@ export interface AiLogEvent {
   level?: string;
   specialist?: string;
   reply?: string;
+  /** Router output (subject id, intent, difficulty): labels only, never the question. */
+  subject?: string;
+  intent?: string;
+  difficulty?: string;
 }
 
 const quiet = () => process.env.OLIS_AI_LOGS === "off";

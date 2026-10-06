@@ -439,6 +439,42 @@ await test("23. math_check tool runs deterministically and its result is returne
   assert(text.includes("5"), `text=${text}`);
 });
 
+const sysOf = () => (calls.find((c) => c.model.startsWith("gemini"))!.body as { systemInstruction: { parts: { text: string }[] } }).systemInstruction.parts[0].text;
+
+await test("24. router meta event: subject, topic, level and confidence reach the browser", async () => {
+  const { events } = await readSSE(await agentPOST(apiRequest("/api/agent", agentBody("Explain Newton's second law of motion", { profile: { examLevel: "AL" } }))));
+  const meta = (events.find((e) => e.type === "meta") as { meta?: unknown } | undefined)?.meta as { subject?: string; level?: string; intent?: string; confidence?: string } | undefined;
+  assert(meta, "no meta event");
+  assert(meta.subject === "physics" && meta.level === "AL" && meta.intent === "concept_explanation", `meta=${JSON.stringify(meta)}`);
+  assert(meta.confidence === "confident" || meta.confidence === "likely", `confidence=${meta.confidence} (Newton notes exist)`);
+});
+
+await test("25. subject method from the registry is in the prompt (A/L Geography)", async () => {
+  await readSSE(await agentPOST(apiRequest("/api/agent", agentBody("Explain monsoon rainfall in Sri Lanka", { profile: { examLevel: "AL" } }))));
+  const sys = sysOf();
+  assert(sys.includes("You are acting as the Geography tutor") && sys.includes("Geography method"), "geography strategy missing");
+  assert(sys.includes("Geography: Climatology"), "focused topic map missing");
+  assert(!sys.includes("Combined Mathematics: Algebra"), "unrelated subjects leaked into the topic map");
+});
+
+await test("26. marking mode: estimated-marks wording, never an official mark", async () => {
+  await readSSE(await agentPOST(apiRequest("/api/agent", agentBody("How many marks would I get for this answer: momentum is mass times velocity"))));
+  const sys = sysOf();
+  assert(sys.includes("# Marking mode") && sys.includes("Estimated based on the available marking scheme. This is not an official examination mark."), "marking rules missing");
+});
+
+await test("27. current information: model is told to cite source and year", async () => {
+  await readSSE(await agentPOST(apiRequest("/api/agent", agentBody("What is the current inflation rate in Sri Lanka?"))));
+  const sys = sysOf();
+  assert(sys.includes("# Current information") && /accessed \d{4}-\d{2}-\d{2}/.test(sys), "current-info rule missing");
+});
+
+await test("28. Tamil preference → Tamil reply rules, multilingual route", async () => {
+  await readSSE(await agentPOST(apiRequest("/api/agent", agentBody("what is speed", { profile: { language: "ta" } }))));
+  const sys = sysOf();
+  assert(sys.includes("Reply in Tamil (Tamil script)") && sys.includes("Tamil Unicode"), "Tamil rules missing");
+});
+
 // ── Report ─────────────────────────────────────
 globalThis.fetch = realFetch;
 console.log = realLog;
