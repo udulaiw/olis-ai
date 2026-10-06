@@ -18,7 +18,7 @@ import { systemPrompt, type LearningContext, type StudentProfile } from "./promp
 import { classifyRequest, confidenceOf, type Confidence, type Intent } from "./ai/intent.js";
 import { streamWithFallback } from "./ai/router.js";
 import { newRequestId, aiLog } from "./ai/log.js";
-import { createScriptGuard } from "./lang/unicode.mjs";
+import { createScriptGuard, repairIndicToSinhala } from "./lang/unicode.mjs";
 import type { ChatMessage, ImageInput, ToolCall } from "./ai/types.js";
 import { extractMemories, selectMemories, languageFromMemory, levelFromMemory, type MemoryItem } from "./memory.js";
 import { fetchLive, type LiveResult } from "./live/tools.js";
@@ -260,6 +260,8 @@ export async function* runAgent(cfg: Config, req: AgentRequest, signal?: AbortSi
   const allowOtherScripts = /hindi|devanagari|tamil|தமிழ்|हिन्दी/i.test(question) || /[\u0900-\u097F\u0B80-\u0BFF]/.test(question);
   const expectScript = allowOtherScripts ? "any" : cls.reply === "ta" ? "ta" : cls.reply === "en" ? "en" : "si";
   let scriptRetried = false;
+  /** Look-alike letters (Malayalam, and Devanagari on the retry) repaired into Sinhala. */
+  let repaired = 0;
 
   // 2) Build the conversation (neutral format; the router adapts it per provider)
   const hasImages = Boolean(req.images?.length);
@@ -312,16 +314,24 @@ export async function* runAgent(cfg: Config, req: AgentRequest, signal?: AbortSi
             nativeProvider = ev.provider;
             break;
           case "text": {
-            // Wrong-script output (Devanagari/Tamil/U+FFFD in a Sinhala or English answer): stop, discard, retry once
-            const b = scriptRetried ? null : guard(ev.delta);
+            // 1) Sinhala answers: stray Malayalam letters ("കൊളඹ") are the same sounds in the neighbouring Unicode block:
+            //    map them to Sinhala in place. On the retry, Devanagari too, so a second bad attempt is never shown broken.
+            let delta = ev.delta;
+            if (expectScript === "si") {
+              const fix = repairIndicToSinhala(delta, { devanagari: scriptRetried });
+              delta = fix.text;
+              repaired += fix.changed;
+            }
+            // 2) Anything else in the wrong script (Devanagari/Tamil/other Indic/U+FFFD): stop, discard, retry once
+            const b = scriptRetried ? null : guard(delta);
             if (b) {
               bad = b;
               break;
             }
-            text += ev.delta;
-            emitted += ev.delta.length;
+            text += delta;
+            emitted += delta.length;
             wroteText = true;
-            yield { type: "text", delta: ev.delta };
+            yield { type: "text", delta };
             break;
           }
           case "tool_call":
@@ -389,6 +399,7 @@ export async function* runAgent(cfg: Config, req: AgentRequest, signal?: AbortSi
   }
 
   if (!wroteText) yield { type: "text", delta: "I couldn't put together an answer this time. Please try rephrasing your question." };
+  if (repaired) aiLog({ evt: "ai.script_guard", requestId, route: "agent", error: "lookalike_repaired", detail: `${repaired} chars`, model: served, reply: cls.reply });
   // One routing line per request: what was used and how long it took. Labels only, never the question or answer.
   aiLog({ evt: "ai.route", requestId, route: "agent", intent: cls.intent, subject: cls.subject ?? "none", tools: toolsUsed.join(",") || "model", ms: Date.now() - t0, ok: wroteText, live: live ? (live.ok ? "ok" : "failed") : undefined });
 }

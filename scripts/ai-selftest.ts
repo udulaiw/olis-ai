@@ -406,6 +406,33 @@ await test("18. wrong-script answer (Devanagari in Sinhala reply) → rewind + r
   assert(all.includes('"evt":"ai.script_guard"') && !all.includes("गुरुत्वाकर्षण"), "script guard not logged, or student/model text logged");
 });
 
+await test("18b. Malayalam letters mixed into Sinhala ('കൊළඹ පැත്തേ') → repaired in place, no retry", async () => {
+  // The exact text a student saw: 7 of 11 characters were Malayalam look-alikes
+  const broken = "අපි \u0d15\u0d4a\u0dc5\u0db9 \u0d2a\u0dd0\u0d24\u0d4d\u0d24\u0d47 යමු. ശ്രී ලංකාව ලස්සනයි.";
+  behaviours["gemini-3.5-flash"] = [{ kind: "text", text: broken }];
+  process.env.OLIS_AI_LOGS = "";
+  const { events, text } = await readSSE(await agentPOST(apiRequest("/api/agent", agentBody("කොළඹ ගැන කියන්න"))));
+  assert(!/[\u0D00-\u0D7F]/.test(text), `Malayalam reached the student: ${text}`);
+  assert(text === "අපි කොළඹ පැත්තේ යමු. ශ්\u200dරී ලංකාව ලස්සනයි.", `text=${JSON.stringify(text)}`);
+  assert(!events.some((e) => e.type === "rewind"), "should be repaired in place, not retried");
+  assert(calls.filter((c) => c.model.startsWith("gemini")).length === 1, "an extra model call was made");
+  assert(logs.join("\n").includes('"error":"lookalike_repaired"'), "repair not logged");
+});
+
+await test("18c. Devanagari on the first AND the retry → the retry is repaired, never shown broken", async () => {
+  behaviours["gemini-3.5-flash"] = [{ kind: "text", text: "यह बल है" }, { kind: "text", text: "මෙය विद्युत් ධාරාවයි." }];
+  const { text } = await readSSE(await agentPOST(apiRequest("/api/agent", agentBody("විද්‍යුත් ධාරාව කියන්නේ මොකක්ද?"))));
+  assert(!/[\u0900-\u097F]/.test(text), `Devanagari reached the student: ${text}`);
+  assert(text === "මෙය විද්\u200dයුත් ධාරාවයි.", `text=${JSON.stringify(text)}`);
+});
+
+await test("18d. Malayalam in an ENGLISH answer → rewind and retry (not transliterated)", async () => {
+  behaviours["gemini-3.5-flash-lite"] = [{ kind: "text", text: "Colombo is in കേരളം" }, { kind: "text", text: "Colombo is on the west coast of Sri Lanka." }];
+  const { events, text } = await readSSE(await agentPOST(apiRequest("/api/agent", agentBody("Where is Colombo?", { profile: { language: "en" } }))));
+  assert(text === "Colombo is on the west coast of Sri Lanka.", `text=${text}`);
+  assert(events.some((e) => e.type === "rewind") || calls.filter((c) => c.model.startsWith("gemini")).length >= 2, "no retry");
+});
+
 await test("19. Sinhala (ZWJ conjuncts) survives the API round trip byte-for-byte", async () => {
   const q = "ශ්‍රී ලංකාවේ විද්‍යාව ගැන කියන්න";
   const answer = "ශ්‍රී ලංකාව; විද්‍යාව; භෞතික විද්‍යාව; රසායන විද්‍යාව; ගණිතය. Newton's second law එක: $F=ma$";

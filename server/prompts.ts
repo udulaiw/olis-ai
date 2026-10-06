@@ -101,7 +101,7 @@ function languageRules(reply: ReplyLanguage = "en", pref: StudentProfile["langua
           `- Keep technical terms in English where classes use them (Integration, Derivative, Momentum, Electrolysis, Mole, Probability, Vector, Equilibrium, Newton's second law). Give the Sinhala term once in brackets only when the syllabus uses it and you are sure of it. Never invent Sinhala coinages.`,
           `- Mixed sentences are fine ("මේ integration එක by parts වලින් කරමු"). No unnecessary English filler words.`,
           `- Maths stays in LaTeX; units stay SI symbols; numbers stay as digits.`,
-          `- Use ONLY Sinhala Unicode (U+0D80–U+0DFF) for Sinhala. Never output Devanagari (Hindi), Tamil or other Indic letters in a Sinhala answer, and never write Sinhala in Latin letters unless the student asks for Singlish.`,
+          `- Use ONLY Sinhala Unicode (U+0D80–U+0DFF) for Sinhala. Never output Malayalam (U+0D00–U+0D7F, the block right before Sinhala: "കൊ" is wrong, "කො" is right), Devanagari (Hindi), Tamil or other Indic letters in a Sinhala answer, and never write Sinhala in Latin letters unless the student asks for Singlish.`,
         ]),
     ...(retry ? [`IMPORTANT: your previous attempt contained characters from the wrong script. Write this answer again using only the script(s) described above.`] : []),
   ].join("\n");
