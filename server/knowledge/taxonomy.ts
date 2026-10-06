@@ -13,7 +13,15 @@
 //
 // `keywords` and `patterns` are routing hints only, never shown to students.
 // ─────────────────────────────────────────────
-import registry from "./subjects.json";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
+// Read at runtime (like server/generated/index.json), NOT `import … from "./subjects.json"`:
+// Vite accepts a bare JSON import, but Node.js in a Vercel function refuses it
+// (ERR_IMPORT_ATTRIBUTE_MISSING) and every route that loads this module crashes with a 500.
+// vercel.json ships the file via includeFiles; scripts/prod-smoke.mjs checks every route loads in plain Node.
+const REGISTRY_PATH = process.env.OLIS_REGISTRY_PATH || join(process.cwd(), "server", "knowledge", "subjects.json");
+const registry: unknown = JSON.parse(readFileSync(REGISTRY_PATH, "utf8"));
 
 export type ExamLevel = "OL" | "AL";
 /** "ANY" = shown to both O/L and A/L students (study skills, general knowledge). */

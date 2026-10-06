@@ -16,7 +16,8 @@
     "eval": "node scripts/run-ts.mjs scripts/eval.ts",
     "eval:live": "node scripts/eval-live.mjs",
     "ingest": "node scripts/ingest.mjs",
-    "test": "npm run test:ai && npm run test:lang && npm run eval"
+    "test:prod": "node scripts/prod-smoke.mjs",
+    "test": "npm run test:ai && npm run test:lang && npm run eval && npm run test:prod"
   },
   "dependencies": {
     "katex": "^0.18.7",
