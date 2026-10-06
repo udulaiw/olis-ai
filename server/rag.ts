@@ -36,6 +36,15 @@ export interface Chunk {
   tier?: number;
   /** Page range in the source document, e.g. "12-14" (from [p.N] markers added by scripts/ingest.mjs). */
   pages?: string;
+  /** Literature metadata (knowledge/literature/README.md): literary form, author, work title, chapter, themes / devices covered. */
+  form?: string;
+  author?: string;
+  work?: string;
+  chapter?: string;
+  theme?: string;
+  device?: string;
+  syllabus_year?: string;
+  exam_year?: string;
 }
 export type ChunkType = NonNullable<Chunk["type"]>;
 interface IndexFile {
@@ -65,6 +74,7 @@ let cache: Loaded | null = null;
 /** Tests only: drop the cached index so OLIS_INDEX_PATH can point somewhere else. */
 export function _resetIndex() {
   cache = null;
+  worksCache = null;
 }
 
 export function loadIndex(): Loaded {
@@ -213,7 +223,7 @@ export function groundingOf(hits: Hit[]): Grounding {
 export async function searchKnowledge(
   cfg: Config,
   query: string,
-  opts: { k?: number; subject?: string; signal?: AbortSignal; types?: ChunkType[]; year?: string; level?: "OL" | "AL" | null } = {},
+  opts: { k?: number; subject?: string; signal?: AbortSignal; types?: ChunkType[]; year?: string; level?: "OL" | "AL" | null; work?: string | null } = {},
 ): Promise<Hit[]> {
   const idx = loadIndex();
   if (!idx.chunks.length) return [];
@@ -225,6 +235,8 @@ export async function searchKnowledge(
     if (opts.year && c.year !== opts.year) return false;
     // Level is a hard filter ONLY when the chunk declares one: O/L notes never answer an A/L student and vice versa
     if (opts.level && c.level && c.level !== opts.level) return false;
+    // Literature: a named work is a hard metadata filter (applied before ranking); general notes without a work stay eligible
+    if (opts.work && c.work && !c.work.split(/\s*;\s*/).includes(opts.work)) return false;
     return true;
   };
   const kw = bm25(idx, query).filter((h) => allowed(h.i)).slice(0, 20);
@@ -284,6 +296,7 @@ export async function searchKnowledge(
           v.score +
           (opts.subject && c.subject.toLowerCase() === opts.subject.toLowerCase() ? 0.002 : 0) +
           (opts.level && c.level === opts.level ? 0.001 : 0) +
+          (opts.work && c.work ? 0.004 : 0) +
           (7 - tier) * 0.0003,
       };
     })
@@ -298,6 +311,23 @@ export async function searchKnowledge(
       unknownShare,
       semScore: semScore.get(h.i),
     }));
+}
+
+let worksCache: { key: string; work: string }[] | null = null;
+/**
+ * The literary work (from the index's `work:` metadata) that a question names, if any:
+ * "Is Macbeth responsible for his downfall?" → "Macbeth" once a Macbeth note is indexed.
+ * Lets the router recognise a literature question with no literary vocabulary in it,
+ * and lets retrieval filter to that work before ranking.
+ */
+export function workMentioned(text: string): string | null {
+  if (!worksCache) {
+    const seen = new Map<string, string>();
+    for (const c of loadIndex().chunks) if (c.work) for (const w of c.work.split(/\s*;\s*/)) if (w.length >= 4) seen.set(w.normalize("NFC").toLowerCase(), w);
+    worksCache = [...seen.entries()].map(([key, work]) => ({ key, work })).sort((a, b) => b.key.length - a.key.length);
+  }
+  const t = text.normalize("NFC").toLowerCase();
+  return worksCache.find((w) => t.includes(w.key))?.work ?? null;
 }
 
 export function indexStats() {

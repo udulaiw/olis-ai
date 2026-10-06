@@ -134,6 +134,7 @@ export function AnswerInsight({ meta, sources, className }: { meta: AnswerMeta; 
     meta.subjectName,
     meta.topic,
     meta.level === "OL" ? "O/L" : meta.level === "AL" ? "A/L" : null,
+    meta.lit?.label ?? null,
   ].filter(Boolean) as string[];
   const live = meta.live;
   const fresh = live?.ok ? ago(live.dataTimestamp) ?? ago(live.retrievedAt) : null;

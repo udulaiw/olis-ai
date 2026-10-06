@@ -13,6 +13,8 @@ import { detectLanguage as detect, replyLanguage, expandQuery, resolveFollowUp, 
 import type { Capability, Task } from "./types.js";
 import { detectLive, type LiveQuery } from "../live/detect.js";
 import { HISTORY_CUE, MEMORY_CUE } from "./cues.js";
+import { detectLiterature, type LitProfile } from "../literature/detect.js";
+import { workMentioned } from "../rag.js";
 
 export type LanguagePref = "en" | "si" | "ta" | "auto";
 export type DetectedLanguage = "en" | "si" | "ta" | "singlish" | "mixed";
@@ -138,6 +140,9 @@ export interface Classification {
   /** What to search the knowledge base with (the original message is untouched). */
   retrievalQuery: string;
   followUp: { kind: string; hint: string } | null;
+  /** Literature & language profile (form, task, answer mode, command word, whether the text is available). null = not a literature/language question. */
+  literature: LitProfile | null;
+  work: string | null;
 }
 
 /** Mathematics questions often carry no subject word ("Solve 2x² - 5x - 3 = 0"): pick the maths subject for the level. */
@@ -187,7 +192,7 @@ export function classifyRequest(input: {
 
   const numeric = NUM_WITH_UNIT.test(q) || /\d/.test(q);
   const requiresCalculation =
-    intent === "problem_solving" && (mathy || numeric || ["mathematics", "physics", "chemistry"].includes(discipline)) && !["language", "history"].includes(discipline);
+    intent === "problem_solving" && (mathy || numeric || ["mathematics", "physics", "chemistry"].includes(discipline)) && !["language", "literature", "comprehension", "history"].includes(discipline);
   // Live questions are not in the study notes: skip the knowledge base for them (Performance: route, don't run everything)
   const requiresRetrieval = !live && !["greeting", "planning", "translation"].includes(intent) && q.trim().length > 3;
   const requiresCurrentInfo = Boolean(live) || CURRENT.test(q);
@@ -195,10 +200,13 @@ export function classifyRequest(input: {
   // "who won yesterday's match" is about the world, not about our chats
   const requiresHistory = !live && HISTORY_CUE.test(q);
   const difficulty = difficultyOf(q, intent, examLevel, input.mode, expansion.terms);
+  // Literature & language layer: null for every other kind of question, so other subjects are untouched
+  const work = live ? null : workMentioned(q);
+  const literature = live ? null : detectLiterature({ question: q, subject: subj?.id ?? null, group: subj?.group ?? null, discipline, intent, difficulty, history, attachmentChars: input.attachmentChars, knownWork: work });
 
   const lv = examLevel === "OL" ? "ol" : examLevel === "AL" ? "al" : subj?.level === "OL" ? "ol" : subj?.level === "AL" ? "al" : "any";
   const specialist: Specialist =
-    input.mode === "plan" || intent === "planning" ? "planner" : intent === "past_paper" ? "past-paper" : intent === "marking" ? "marking" : `${lv}-${discipline}`;
+    input.mode === "plan" || intent === "planning" ? "planner" : intent === "past_paper" ? "past-paper" : intent === "marking" ? "marking" : literature?.domain === "literature" && !["literature", "comprehension"].includes(discipline) ? `${lv}-literature` : `${lv}-${discipline}`;
 
   const base = {
     language,
@@ -222,6 +230,9 @@ export function classifyRequest(input: {
     terms: expansion.terms,
     retrievalQuery: follow.isFollowUp ? follow.retrievalQuery : expansion.expanded,
     followUp: follow.isFollowUp ? { kind: follow.kind as string, hint: follow.hint } : null,
+    literature,
+    /** Literary work named in the question that the knowledge base has notes on (retrieval filters to it). */
+    work: literature ? work : null,
   };
   const required: Capability[] = ["text"];
 
@@ -238,6 +249,11 @@ export function classifyRequest(input: {
     required.push("multilingual");
     return { ...base, task: "sinhala", required, reason: `reply=${lang.reply} (${lang.reason})` };
   }
+
+  // Close reading, essays, feedback and comparisons need the stronger reasoning models; quick literature answers don't
+  if (literature && (["deep", "essay", "feedback"].includes(literature.mode) || literature.task === "compare" || (literature.hasText && literature.domain === "literature")))
+    return { ...base, task: "reasoning", required, reason: `literature: ${literature.task} (${literature.mode})` };
+  if (literature) return { ...base, task: "general", required, reason: `literature: ${literature.task} (${literature.mode})` };
 
   const hard = input.mode === "solve" || HARD_WORDS.test(q) || q.length > 400;
   const family = STRATEGIES[discipline]?.task ?? "general";

@@ -137,6 +137,8 @@ export interface AnswerMeta {
   live?: { domain: string; ok: boolean; source: string; retrievedAt: string; dataTimestamp: string | null } | null;
   /** How much saved context was used (counts). */
   context?: { memories: number; previousChats: number };
+  /** Literature & language profile: form and answer mode ("Poetry · Deep analysis"). */
+  lit?: { domain: string; form: string | null; task: string; mode: string; label: string } | null;
 }
 
 /** Something OLIS remembers about the student across chats. Stored in this browser only. */

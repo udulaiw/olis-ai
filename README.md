@@ -159,6 +159,12 @@ answered with that subject's method (e.g. physics: knowns → law → equation �
 with a one-line footer: *Geography · Climatology · A/L · 2 OLIS sources · Confidence: High*. Marking mode always says the result
 is an estimate, not an official mark. Details: **[docs/subject-architecture.md](docs/subject-architecture.md)**.
 
+**Literature & language.** Poetry, prose, novels, drama, grammar, comprehension and creative writing get their own layer: OLIS
+works out the form, the task (devices, theme, character, essay, feedback, question analysis…), the answer mode (quick · teach ·
+exam · deep · essay · feedback · Socratic · revision), the exam command word, and whether the actual text is in front of it. It
+separates fact from interpretation, never invents quotations, and asks for the passage before line-level analysis. Add texts
+with `work:` metadata in `knowledge/literature/`. Details: **[docs/literature-intelligence.md](docs/literature-intelligence.md)**.
+
 ## Sri Lankan O/L and A/L knowledge
 
 - `server/knowledge/subjects.json`: the **provisional** topic map, used for routing, tagging and "what topic is this testing?". Units are marked `verified: false` until checked against the NIE syllabus.

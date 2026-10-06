@@ -47,5 +47,8 @@ export async function POST(request: Request): Promise<Response> {
     requires_history: c.requiresHistory,
     requires_current_info: c.requiresCurrentInfo,
     follow_up: c.followUp?.kind ?? null,
+    literature: c.literature
+      ? { domain: c.literature.domain, form: c.literature.form, task: c.literature.task, mode: c.literature.mode, command_word: c.literature.command, has_text: c.literature.hasText, text_language: c.literature.textLanguage, pitch: c.literature.pitch }
+      : null,
   });
 }

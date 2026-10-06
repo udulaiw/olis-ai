@@ -7,5 +7,6 @@ dist
 .DS_Store
 evals/fixtures/.index.json
 evals/fixtures/.kb
+evals/fixtures/.lit-index.json
 evals/last-report.json
 evals/last-live-report.json
