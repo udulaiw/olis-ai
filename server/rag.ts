@@ -5,9 +5,10 @@
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { tokenize } from "./text.mjs";
-import { embedQuery } from "./gemini.js";
+import { embedSettings, embedTexts, embeddingsConfigured } from "./embeddings.mjs";
 import type { Config } from "./config.js";
 import { embeddingAllowed } from "./ai/policy.js";
+import { rerank, formulaTokens, squash } from "./rerank.js";
 
 export interface Chunk {
   id: string;
@@ -34,6 +35,11 @@ export interface Chunk {
   grade?: string;
   /** Source priority 1 (official syllabus) … 7 (general). See knowledge/README.md. */
   tier?: number;
+  /** Syllabus topic / lesson / exam name / paper section (optional frontmatter). */
+  topic?: string;
+  lesson?: string;
+  exam?: string;
+  section?: string;
   /** Page range in the source document, e.g. "12-14" (from [p.N] markers added by scripts/ingest.mjs). */
   pages?: string;
   /** Literature metadata (knowledge/literature/README.md): literary form, author, work title, chapter, themes / devices covered. */
@@ -50,6 +56,8 @@ export type ChunkType = NonNullable<Chunk["type"]>;
 interface IndexFile {
   version: number;
   builtAt: string;
+  /** "gemini" | "tei"; absent in old indexes (= gemini). */
+  embedProvider?: string | null;
   embedModel: string | null;
   dims: number;
   files: number;
@@ -57,6 +65,8 @@ interface IndexFile {
   vectors: number[][] | null;
 }
 interface Loaded extends IndexFile {
+  /** Chunk text in squashed form for exact formula matching (rerank.ts → squash). */
+  sq: string[];
   tf: Map<string, number>[];
   len: number[];
   df: Map<string, number>;
@@ -95,7 +105,7 @@ export function loadIndex(): Loaded {
     for (const t of m.keys()) df.set(t, (df.get(t) ?? 0) + 1);
   }
   const avgdl = len.reduce((a, b) => a + b, 0) / Math.max(1, len.length);
-  cache = { ...idx, tf, len, df, avgdl };
+  cache = { ...idx, sq: idx.chunks.map((c) => squash(c.text)), tf, len, df, avgdl };
   return cache;
 }
 
@@ -182,6 +192,8 @@ export interface Hit {
   distinctive: number;
   /** Share (0–1) of the query's weight carried by Latin words the knowledge base has never seen. */
   unknownShare: number;
+  /** The chunk contains a formula from the question exactly (e.g. "v = u + at", "H2SO4"). */
+  formula?: boolean;
   semScore?: number;
 }
 
@@ -197,7 +209,7 @@ export const GROUND_NONE_UNKNOWN = 0.4;
 
 
 /** A hit only counts as evidence if it matched a topic-identifying word, or is a strong semantic match. */
-export const isRelevant = (h: Hit) => h.distinctive > 0 || (h.semScore ?? 0) >= 0.62;
+export const isRelevant = (h: Hit) => h.distinctive > 0 || Boolean(h.formula) || (h.semScore ?? 0) >= 0.62;
 export const relevantHits = (hits: Hit[]) => hits.filter(isRelevant);
 
 /**
@@ -214,6 +226,8 @@ export function groundingOf(hits: Hit[]): Grounding {
   if (!good.length) return "none";
   const top = good[0];
   if ((top.semScore ?? 0) >= 0.72) return "strong";
+  // The exact formula the student typed is in the notes: that is direct evidence
+  if (top.formula && top.unknownShare < GROUND_NONE_UNKNOWN) return top.distinctive > 0 || top.unknownShare === 0 ? "strong" : "weak";
   // Most of what the student asked about is vocabulary the KB has never seen ("FIFA", "Kandyan Convention"): the few words that did match are incidental
   if (top.unknownShare >= GROUND_NONE_UNKNOWN) return "none";
   return top.coverage >= 0.6 && top.unknownShare < 0.34 ? "strong" : "weak";
@@ -221,9 +235,9 @@ export function groundingOf(hits: Hit[]): Grounding {
 
 /** Search the knowledge base. Semantic search is used when available; failures fall back to keywords. */
 export async function searchKnowledge(
-  cfg: Config,
+  _cfg: Config, // kept for callers; embedding settings come from server/embeddings.mjs
   query: string,
-  opts: { k?: number; subject?: string; signal?: AbortSignal; types?: ChunkType[]; year?: string; level?: "OL" | "AL" | null; work?: string | null } = {},
+  opts: { k?: number; subject?: string; signal?: AbortSignal; types?: ChunkType[]; year?: string; level?: "OL" | "AL" | null; work?: string | null; rerank?: boolean } = {},
 ): Promise<Hit[]> {
   const idx = loadIndex();
   if (!idx.chunks.length) return [];
@@ -239,12 +253,31 @@ export async function searchKnowledge(
     if (opts.work && c.work && !c.work.split(/\s*;\s*/).includes(opts.work)) return false;
     return true;
   };
-  const kw = bm25(idx, query).filter((h) => allowed(h.i)).slice(0, 20);
+  let kw = bm25(idx, query).filter((h) => allowed(h.i)).slice(0, 20);
+  // Formulas ("v = u + at", "H2SO4") are mostly 1-letter symbols the tokenizer drops: match them exactly as well
+  const formulas = formulaTokens(query);
+  if (formulas.length) {
+    const top = kw[0]?.score ?? 2;
+    const exact = idx.chunks
+      .map((_c, i) => ({ i, n: formulas.filter((f) => idx.sq[i].includes(f)).length }))
+      .filter((h) => h.n && allowed(h.i))
+      .map((h) => ({ i: h.i, score: top * (0.8 + 0.2 * (h.n / formulas.length)) }));
+    const seen = new Map(kw.map((h) => [h.i, h]));
+    for (const h of exact) {
+      const cur = seen.get(h.i);
+      if (cur) cur.score = Math.max(cur.score, h.score) + 0.01;
+      else seen.set(h.i, h);
+    }
+    kw = [...seen.values()].sort((a, b) => b.score - a.score).slice(0, 20);
+  }
 
   let sem: { i: number; score: number }[] = [];
-  if (idx.vectors && idx.dims && cfg.geminiKey && embeddingAllowed(cfg.embedModel)) {
+  const emb = embedSettings();
+  // Only compare vectors from the same model (a different provider/model = a different vector space)
+  const sameSpace = idx.vectors && idx.dims && idx.embedModel === emb.model && (idx.embedProvider ?? "gemini") === emb.provider && idx.dims === emb.dims;
+  if (sameSpace && embeddingsConfigured(emb) && (emb.provider !== "gemini" || embeddingAllowed(emb.model))) {
     try {
-      const qv = await embedQuery(cfg, query, idx.dims, opts.signal);
+      const [qv] = await embedTexts([query], { kind: "query", signal: opts.signal, settings: emb });
       sem = cosineRank(idx, qv).filter((h) => allowed(h.i)).slice(0, 20).filter((h) => h.score > 0.5);
     } catch {
       sem = []; // quota / network: keyword search still works
@@ -273,7 +306,9 @@ export async function searchKnowledge(
   const isSi = (t: string) => /[\u0D80-\u0DFF]/.test(t);
   const qAll = Array.from(new Set(correctTypos(idx, tokenize(query)))).filter((t) => !EXAM_META.has(t) && !/^\d+$/.test(t)); // evidence of TOPIC only; BM25 below still uses every word
   // A script the KB doesn't contain (Sinhala words, while the notes are English) is not evidence of absence: ignore those words
-  const qTerms = qAll.filter((t) => (idx.df.get(t) ?? 0) > 0 || !isSi(t));
+  // A formula the notes contain exactly ("h2so4" written as H₂SO₄) is known, even if the tokenizer splits it differently there
+  const formulaKnown = (t: string) => formulas.some((f) => f.includes(t) && idx.sq.some((x) => x.includes(f)));
+  const qTerms = qAll.filter((t) => ((idx.df.get(t) ?? 0) > 0 || !isSi(t)) && !((idx.df.get(t) ?? 0) === 0 && formulaKnown(t)));
   const known = qTerms.filter((t) => (idx.df.get(t) ?? 0) > 0);
   const unknownW = qTerms.filter((t) => !(idx.df.get(t) ?? 0)).reduce((a, t) => a + idfOf(t), 0);
   const knownW = known.reduce((a, t) => a + idfOf(t), 0);
@@ -282,7 +317,7 @@ export async function searchKnowledge(
   // "Topical" = a known, non-task word of the question that this chunk actually contains
   const distinctiveOf = (i: number) => known.filter((t) => idx.tf[i].has(t)).length;
 
-  return [...fused.entries()]
+  const candidates = [...fused.entries()]
     // Keep a hit if keyword search agrees, or if it's a strong semantic match on its own
     .filter(([i, v]) => (kwScore.get(i) ?? 0) >= minKw || (v.sem && (semScore.get(i) ?? 0) >= 0.62))
     .map(([i, v]) => {
@@ -301,6 +336,17 @@ export async function searchKnowledge(
       };
     })
     .sort((a, b) => b.score - a.score)
+    .slice(0, Math.max(12, k * 3));
+
+  // Second stage: exact-evidence signals (formulas, question numbers, years, phrases) + optional cross-encoder
+  let ordered = candidates;
+  if (candidates.length > 1 && opts.rerank !== false) {
+    const { results } = await rerank(query, candidates.map((h) => ({ id: h.i, text: idx.chunks[h.i].text, score: h.score, question: idx.chunks[h.i].question, year: idx.chunks[h.i].year })), { signal: opts.signal });
+    const byId = new Map(candidates.map((h) => [h.i, h]));
+    ordered = results.map((r) => byId.get(r.id)!);
+  }
+
+  return ordered
     .slice(0, k)
     .map((h) => ({
       chunk: idx.chunks[h.i],
@@ -309,6 +355,7 @@ export async function searchKnowledge(
       coverage: coverageOf(h.i),
       distinctive: distinctiveOf(h.i),
       unknownShare,
+      formula: formulas.length > 0 && formulas.some((f) => idx.sq[h.i].includes(f)),
       semScore: semScore.get(h.i),
     }));
 }

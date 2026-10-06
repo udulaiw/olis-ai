@@ -33,6 +33,20 @@ for (const [k, v] of Object.entries(SI_TERMS)) {
   if (key.includes(" ")) PHRASES.push([key, v]);
   else TERM_BY_STEM.set(stemSinhala(key), v);
 }
+// Reverse map for English questions about Sinhala material ("photosynthesis" → ප්‍රභාසංශ්ලේෂණය…).
+// Used where there is no multilingual embedding (searching inside an attached document).
+const SI_BY_EN = new Map();
+for (const [k, v] of Object.entries(SI_TERMS))
+  for (const en of String(v).toLowerCase().split(/\s+/)) if (en.length > 3) SI_BY_EN.set(en, [...(SI_BY_EN.get(en) ?? []), cleanSinhala(k)]);
+/**
+ * Sinhala glossary terms for the English words in a question (empty string if none).
+ * @param {string} question
+ */
+export function sinhalaTermsFor(question) {
+  const out = new Set();
+  for (const w of question.toLowerCase().match(/[a-z]+/g) ?? []) for (const si of SI_BY_EN.get(w) ?? SI_BY_EN.get(w.replace(/s$/, "")) ?? []) out.add(si);
+  return [...out].join(" ");
+}
 const INTENT_BY_WORD = new Map(Object.entries(SI_INTENT).map(([k, v]) => [cleanSinhala(k), v]));
 // "කියන්නේ" (means) stems to "කියන්න" (say!), so intent words are matched stem-wise only when they are not that one
 const INTENT_BY_STEM = new Map([...INTENT_BY_WORD].filter(([k]) => k !== "කියන්නේ").map(([k, v]) => [stemSinhala(k), v]));

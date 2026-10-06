@@ -5,7 +5,7 @@
 import { redact } from "./classify.js";
 
 export interface AiLogEvent {
-  evt: "ai.call" | "ai.fallback" | "ai.exhausted" | "ai.policy_block" | "ai.budget" | "ai.script_guard" | "ai.retrieval" | "ai.route";
+  evt: "ai.call" | "ai.fallback" | "ai.exhausted" | "ai.policy_block" | "ai.budget" | "ai.script_guard" | "ai.retrieval" | "ai.route" | "ai.document" | "ai.source";
   requestId?: string;
   route?: string; // agent | generate
   task?: string;
@@ -34,6 +34,14 @@ export interface AiLogEvent {
   /** ai.route: sources used ("rag,memory,live:crypto") and live-data outcome */
   tools?: string;
   live?: string;
+  /** ai.document: how passages were picked from the student's attachment (counts only, never the text) */
+  strategy?: string;
+  chunks?: number;
+  used?: number;
+  pages?: string;
+  /** ai.source: external knowledge source (wikipedia, wikidata, openalex…) and whether the cache answered */
+  source?: string;
+  cached?: boolean;
 }
 
 const quiet = () => process.env.OLIS_AI_LOGS === "off";

@@ -7,6 +7,7 @@ import { Icon, type IconName } from "../components/Icon";
 import { cx } from "../lib/utils";
 import { StudyProfileEditor } from "../components/StudyProfile";
 import { MemoryPanel } from "../components/MemoryPanel";
+import { PersonalitySettings } from "../components/PersonalitySettings";
 import { lazy, Suspense } from "react";
 // Admin-only: not downloaded unless unlocked
 const DeveloperPanel = lazy(() => import("../components/DeveloperPanel").then((m) => ({ default: m.DeveloperPanel })));
@@ -76,6 +77,10 @@ export function SettingsView() {
 
         <Section title="Default learning context" desc="OLIS uses this to adapt every answer. You can also change it from the chat.">
           <ContextBar compact />
+        </Section>
+
+        <Section title="AI Personality" desc="Choose how OLIS talks to you. Every style uses the same sources and accuracy checks; only the teaching approach changes.">
+          <PersonalitySettings />
         </Section>
 
         <Section title="Study profile" desc="Tell OLIS how you learn. It uses this to pitch explanations and focus on the topics you find hard.">
@@ -188,7 +193,7 @@ export function SettingsView() {
                 }
               }}
             >
-              v0.5 · beta
+              v0.7 · beta
             </button>
           </div>
           <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface-2 px-4 py-3">

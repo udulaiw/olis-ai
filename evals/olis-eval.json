@@ -9,7 +9,10 @@
     "covered": 90,
     "levelIsolation": 100,
     "detection": 100,
-    "reply": 100
+    "reply": 100,
+    "hit3_formula": 100,
+    "docHit1": 95,
+    "docInventedPages": 0
   },
   "_floors_note": "Regression floors for `npm run eval`: set a little below the measured baseline. Raise them when you improve retrieval; never lower one to make a failing change pass without saying why.",
   "language": [
@@ -629,6 +632,136 @@
         "en",
         "lit"
       ]
+    },
+    {
+      "q": "How do I convert decimal 13 to binary?",
+      "expect": [
+        "knowledge/ol/ict/number-systems-logic-gates.md"
+      ],
+      "tags": [
+        "en",
+        "ict",
+        "ol"
+      ]
+    },
+    {
+      "q": "truth table of an AND gate",
+      "expect": [
+        "knowledge/ol/ict/number-systems-logic-gates.md"
+      ],
+      "tags": [
+        "en",
+        "ict",
+        "ol"
+      ]
+    },
+    {
+      "q": "binary to hexadecimal conversion",
+      "expect": [
+        "knowledge/ol/ict/number-systems-logic-gates.md"
+      ],
+      "tags": [
+        "en",
+        "ict",
+        "ol"
+      ]
+    },
+    {
+      "q": "When is the south-west monsoon in Sri Lanka?",
+      "expect": [
+        "knowledge/ol/geography/sri-lanka-climate.md"
+      ],
+      "tags": [
+        "en",
+        "geography",
+        "ol"
+      ]
+    },
+    {
+      "q": "What is the dry zone rainfall?",
+      "expect": [
+        "knowledge/ol/geography/sri-lanka-climate.md"
+      ],
+      "tags": [
+        "en",
+        "geography",
+        "ol"
+      ]
+    },
+    {
+      "q": "ඊසානදිග මෝසම කවදාද?",
+      "expect": [
+        "knowledge/ol/geography/sri-lanka-climate.md"
+      ],
+      "tags": [
+        "si",
+        "geography",
+        "ol"
+      ]
+    },
+    {
+      "q": "inter monsoon eka mokakda",
+      "expect": [
+        "knowledge/ol/geography/sri-lanka-climate.md"
+      ],
+      "tags": [
+        "singlish",
+        "geography",
+        "ol"
+      ]
+    },
+    {
+      "q": "What is the pH of an acid?",
+      "expect": [
+        "knowledge/chemistry/acids-bases.md"
+      ],
+      "tags": [
+        "en",
+        "chemistry"
+      ]
+    },
+    {
+      "q": "Explain the mole concept and Avogadro constant",
+      "expect": [
+        "knowledge/chemistry/mole-concept.md"
+      ],
+      "tags": [
+        "en",
+        "chemistry"
+      ]
+    },
+    {
+      "q": "H2SO4 strong acid",
+      "expect": [
+        "knowledge/chemistry/acids-bases.md"
+      ],
+      "tags": [
+        "en",
+        "chemistry",
+        "formula"
+      ]
+    },
+    {
+      "q": "F = ma",
+      "expect": [
+        "knowledge/physics/newtons-laws.md"
+      ],
+      "tags": [
+        "en",
+        "physics",
+        "formula"
+      ]
+    },
+    {
+      "q": "v = u + at",
+      "expect": [
+        "knowledge/physics/kinematics.md"
+      ],
+      "tags": [
+        "en",
+        "physics",
+        "formula"
+      ]
     }
   ],
   "no_source": [
@@ -685,6 +818,22 @@
       "q": "Which poems are prescribed for the 2027 O/L English Literature syllabus?",
       "tags": [
         "lit",
+        "en"
+      ]
+    },
+    {
+      "q": "Who was the first king of the Anuradhapura kingdom?",
+      "tags": [
+        "history",
+        "ol",
+        "en"
+      ]
+    },
+    {
+      "q": "What is the population of Kandy district in the 2024 census?",
+      "tags": [
+        "geography",
+        "current",
         "en"
       ]
     }
@@ -922,6 +1071,201 @@
       "reply": "si",
       "tags": [
         "unicode"
+      ]
+    },
+    {
+      "id": "wikidata-neptune",
+      "q": "Who discovered Neptune and in which year?",
+      "reply": "en",
+      "must_include_any": [
+        "Galle",
+        "Le Verrier"
+      ],
+      "must_include_all": [
+        "1846"
+      ],
+      "tags": [
+        "en",
+        "external",
+        "wikidata"
+      ]
+    },
+    {
+      "id": "research-exoplanets",
+      "q": "Find recent research papers about exoplanet atmospheres",
+      "reply": "en",
+      "expect_source_kinds": [
+        "research"
+      ],
+      "tags": [
+        "en",
+        "external",
+        "research"
+      ]
+    },
+    {
+      "id": "wiki-blackhole",
+      "q": "What is a black hole? Use Wikipedia.",
+      "reply": "en",
+      "expect_source_kinds": [
+        "wikipedia"
+      ],
+      "must_include_any": [
+        "gravity",
+        "escape"
+      ],
+      "tags": [
+        "en",
+        "external"
+      ]
+    },
+    {
+      "id": "doc-pdf-q5",
+      "q": "Explain question 5 in this paper",
+      "attachment_fixture": "physics-paper.pdf",
+      "reply": "en",
+      "must_include_any": [
+        "340"
+      ],
+      "expect_source_kinds": [
+        "document"
+      ],
+      "expect_doc_page": "3",
+      "tags": [
+        "en",
+        "document"
+      ]
+    },
+    {
+      "id": "doc-pdf-si",
+      "q": "මේ පත්‍රයේ ප්‍රකාශ සංශ්ලේෂණ ප්‍රශ්නයට පිළිතුර මොකක්ද?",
+      "attachment_fixture": "physics-paper.pdf",
+      "reply": "si",
+      "must_include_any": [
+        "කාබන්",
+        "CO2",
+        "CO₂"
+      ],
+      "expect_source_kinds": [
+        "document"
+      ],
+      "tags": [
+        "si",
+        "document"
+      ]
+    },
+    {
+      "id": "personality-socratic",
+      "q": "Solve 2x + 6 = 10",
+      "profile": {
+        "personality": "socratic"
+      },
+      "reply": "en",
+      "must_not_include": [
+        "x = 2"
+      ],
+      "tags": [
+        "en",
+        "personality"
+      ]
+    },
+    {
+      "id": "ol-geo-monsoon",
+      "q": "When does the north-east monsoon bring rain to Sri Lanka?",
+      "profile": {
+        "examLevel": "OL"
+      },
+      "reply": "en",
+      "must_include_any": [
+        "December",
+        "February"
+      ],
+      "tags": [
+        "en",
+        "ol",
+        "geography"
+      ]
+    }
+  ],
+  "_documents_note": "Retrieval INSIDE an attached document (server/docs/retrieve.ts), on evals/fixtures/docs. expect_pages: the passage OLIS should use first; pages must be real PDF pages, and DOCX passages must have none.",
+  "documents": [
+    {
+      "file": "physics-paper.pdf",
+      "q": "Explain question 5 about the sound wave",
+      "expect_pages": "3",
+      "expect_question": "5",
+      "tags": [
+        "en",
+        "question-number"
+      ]
+    },
+    {
+      "file": "physics-paper.pdf",
+      "q": "What is the pH of a neutral solution?",
+      "expect_pages": "2",
+      "tags": [
+        "en"
+      ]
+    },
+    {
+      "file": "physics-paper.pdf",
+      "q": "ප්‍රකාශ සංශ්ලේෂණයට අවශ්‍ය වායුව කුමක්ද?",
+      "expect_pages": "4",
+      "tags": [
+        "si"
+      ]
+    },
+    {
+      "file": "physics-paper.pdf",
+      "q": "balance H2 + O2 -> H2O",
+      "expect_pages": "2",
+      "tags": [
+        "en",
+        "formula"
+      ]
+    },
+    {
+      "file": "physics-paper.pdf",
+      "q": "Q = It charge question",
+      "expect_pages": "1",
+      "tags": [
+        "en",
+        "formula"
+      ]
+    },
+    {
+      "file": "physics-paper.pdf",
+      "q": "wave eke speed eka hoyanna",
+      "expect_pages": "3",
+      "tags": [
+        "singlish"
+      ]
+    },
+    {
+      "file": "chemistry-notes.docx",
+      "q": "How many moles in 36 g of water?",
+      "expect_heading": "Question 1",
+      "tags": [
+        "en",
+        "docx"
+      ]
+    },
+    {
+      "file": "chemistry-notes.docx",
+      "q": "ප්‍රබල අම්ලයක් යනු කුමක්ද?",
+      "expect_heading": "අම්ල සහ භෂ්ම",
+      "tags": [
+        "si",
+        "docx"
+      ]
+    },
+    {
+      "file": "chemistry-notes.docx",
+      "q": "What does a strong acid do in water?",
+      "expect_heading": "අම්ල සහ භෂ්ම",
+      "tags": [
+        "cross-language",
+        "docx"
       ]
     }
   ]

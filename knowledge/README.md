@@ -62,7 +62,9 @@ knowledge/
 Optional frontmatter fields on any file: `level` (`OL` / `AL`), `grade`, `tier` (1–7), `type` (`notes`, `syllabus`,
 `past_paper`, `marking_scheme`, `resource`), `unit` (a unit ID from
 `server/knowledge/taxonomy.ts`), `year`, `paper`, `question`, `question_type`,
-`difficulty`, `marks`, `language` (`en` / `si`), `verified` (`true` / `false`).
+`difficulty`, `marks`, `language` (`en` / `si`), `verified` (`true` / `false`), and (v0.7) `topic`, `lesson`,
+`exam` (e.g. `G.C.E. O/L 2025`), `section`. A past-paper file with several numbered questions is split per question
+automatically, and each chunk keeps its question number and page.
 Files and folders starting with `_` are skipped (templates, drafts).
 Sinhala notes are fine: Sinhala words are searchable too.
 
@@ -74,5 +76,5 @@ Sinhala notes are fine: Sinhala words are searchable too.
 
 ## Tips
 - Keep one topic per file. Split huge files.
-- PDFs aren't read yet. Paste the text into a `.md` file.
+- PDFs: use `scripts/ingest.mjs` (above). Students can also attach PDFs / Word files directly in chat.
 - Only add material you have the right to use.

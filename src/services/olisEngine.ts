@@ -56,8 +56,10 @@ export type EngineEvent =
 
 export interface ResponseRequest {
   input: string;
-  /** Extra hidden context (e.g. attached file text). */
+  /** Extra hidden context (e.g. attached file text). May come from an earlier message in the chat. */
   attachment?: string;
+  /** True when the document was attached to THIS message (a bare attachment then means "summarise it"). */
+  attachmentNew?: boolean;
   /** Photos / screenshots (OLIS Cloud only). */
   images?: CloudImage[];
   mode: Mode;
@@ -89,6 +91,7 @@ async function* streamText(text: string, signal?: AbortSignal): AsyncGenerator<E
 }
 
 const stripAttachHeader = (a: string) => a.replace(/^Attached file "[^"]*":\s*/, "");
+const attachName = (a: string) => a.match(/^Attached file "([^"]*)":/)?.[1];
 
 /** Stream a demo-engine result, running a live Wikipedia lookup when needed. */
 async function* playDemo(out: DemoOutput, signal?: AbortSignal): AsyncGenerator<EngineEvent> {
@@ -138,7 +141,7 @@ function cloudSuggestions(input: string, intent: Intent): string[] {
 export async function* generateResponse(req: ResponseRequest, cfg: EngineConfig): AsyncGenerator<EngineEvent> {
   let intent = detectIntent(req.input, req.mode);
   // An attached document with no specific instruction → summarise it
-  if (req.attachment && (intent === "ask" || !req.input.trim())) intent = "summarize";
+  if (req.attachment && req.attachmentNew !== false && (intent === "ask" || !req.input.trim())) intent = "summarize";
 
   if (cfg.kind === "demo" && req.images?.length) {
     yield* streamText(
@@ -184,6 +187,7 @@ export async function* generateResponse(req: ResponseRequest, cfg: EngineConfig)
     {
       messages,
       attachment: req.attachment ? stripAttachHeader(req.attachment) : undefined,
+      attachmentName: req.attachment ? attachName(req.attachment) : undefined,
       images: req.images,
       mode: intent === "greeting" || intent === "thanks" || intent === "about" ? "ask" : (intent as Mode),
       context: req.context,

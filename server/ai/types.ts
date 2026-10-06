@@ -5,7 +5,7 @@
 // OpenAI "choice" looks like. Everything talks in these shapes.
 // ─────────────────────────────────────────────
 
-export type ProviderId = "gemini" | "nvidia" | "local";
+export type ProviderId = "gemini" | "groq" | "cerebras" | "nvidia" | "mistral" | "openrouter" | "local";
 
 /** What a request needs from a model. The router matches these against the catalog. */
 export type Capability = "text" | "tools" | "vision" | "json" | "long_context" | "reasoning" | "multilingual";

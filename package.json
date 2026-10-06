@@ -1,8 +1,8 @@
 {
   "name": "olis-ai-beta",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "private": true,
-  "description": "OLIS AI Beta — Orbix Learning Intelligence System. A free-to-run AI learning workspace prototype.",
+  "description": "OLIS AI Beta \u2014 Orbix Learning Intelligence System. A free-to-run AI learning workspace prototype.",
   "type": "module",
   "scripts": {
     "dev": "node scripts/build-index.mjs && vite",
@@ -18,13 +18,16 @@
     "eval:live": "node scripts/eval-live.mjs",
     "ingest": "node scripts/ingest.mjs",
     "test:prod": "node scripts/prod-smoke.mjs",
-    "test": "npm run test:ai && npm run test:lang && npm run test:lit && npm run eval && npm run test:prod"
+    "test": "npm run test:ai && npm run test:lang && npm run test:lit && npm run test:rag && npm run eval && npm run test:prod",
+    "test:rag": "node scripts/run-ts.mjs scripts/rag-selftest.ts"
   },
   "dependencies": {
+    "fflate": "^0.8.3",
     "katex": "^0.18.7",
     "marked": "^18.0.14",
     "mathjs": "^15.2.0",
     "motion": "^13.4.1",
+    "pdfjs-dist": "^6.4.299",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "thinking-orbs": "^0.3.2"
@@ -35,8 +38,6 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.1",
-    "fflate": "^0.8.3",
-    "pdfjs-dist": "^6.4.299",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
     "vite": "^8.3.0"

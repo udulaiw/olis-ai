@@ -4,7 +4,7 @@
 import { FREE_BETA_ALLOWLIST, PAID_MODEL_PATTERNS, type ModelSpec } from "./models.config.js";
 import type { ProviderId } from "./types.js";
 
-const KNOWN_PROVIDERS: ProviderId[] = ["gemini", "nvidia", "local"];
+const KNOWN_PROVIDERS: ProviderId[] = ["gemini", "groq", "cerebras", "nvidia", "mistral", "openrouter", "local"];
 
 /** Free Beta is ON unless explicitly set to "false". A typo keeps it on. */
 export function freeBetaEnabled(): boolean {
@@ -29,7 +29,7 @@ export function policyBlock(spec: ModelSpec): string | null {
   if (spec.provider === "local") return null;
   if (PAID_MODEL_PATTERNS.some((p) => p.test(spec.model))) return `"${spec.model}" matches a paid-model pattern`;
   const allowed = FREE_BETA_ALLOWLIST[spec.provider] ?? [];
-  if (allowed.includes("*") || allowed.includes(spec.model) || extraApproved().has(`${spec.provider}:${spec.model}`)) return null;
+  if (allowed.includes("*") || allowed.includes(spec.model) || (allowed.includes("*:free") && spec.model.endsWith(":free")) || extraApproved().has(`${spec.provider}:${spec.model}`)) return null;
   return `"${spec.model}" is not on the Free Beta allowlist`;
 }
 

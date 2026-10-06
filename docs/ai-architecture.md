@@ -50,7 +50,7 @@ Browser ──POST /api/agent──▶ guard (origin · burst limit · daily lim
 | `server/ai/store.ts` | Daily counters (memory, or Upstash Redis if configured) |
 | `server/ai/log.ts` | One JSON log line per call. No prompts, answers or keys |
 | `server/ai/status.ts` | Health summaries: internal (admin) and public (counts only) |
-| `server/ai/providers/` | `gemini.ts`, `openai-compatible.ts` (NVIDIA, Local), registry |
+| `server/ai/providers/` | `gemini.ts`, `openai-compatible.ts` (Groq, Cerebras, NVIDIA, Mistral, OpenRouter, open-source server; OpenAI-style tool calling), registry |
 
 ## Streaming fallback
 
@@ -75,6 +75,12 @@ switches provider mid-research, earlier tool calls and results are rewritten
 into plain text (`providers/shared.ts → normalizeForProvider`), so nothing that
 was already looked up is lost.
 
+OpenAI-compatible providers whose catalog entry has the `tools` capability
+(Groq, Cerebras, Mistral) get the OpenAI `tools` list and stream `tool_calls`
+back; argument fragments are joined before running a tool, and an invalid or
+truncated call is dropped rather than run with guessed arguments. Their own
+tool turns are replayed natively (`assistant.tool_calls` + `role: "tool"`).
+
 ## Loop safety
 
 Each call tries each candidate at most twice (one retry, only for 5xx), the
@@ -93,4 +99,4 @@ Upstash variables.
 
 - No key rotation or multiple keys per provider (see README: quota abuse is out of scope).
 - No paid models in Free Beta.
-- No tool calling on OpenAI-compatible providers yet (support varies by model).
+- No tool calling on NVIDIA / OpenRouter / the open-source slot (support varies by model).

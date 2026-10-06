@@ -7,6 +7,7 @@ import { AIcon, HoverAnimate } from "./AnimatedIcon";
 import { Orb } from "./Orb";
 import { cx } from "../lib/utils";
 import { IMAGE_ACCEPT, isImageFile, prepareImage, type PreparedImage } from "../lib/image";
+import { DOC_ACCEPT, DocError, readDocument } from "../lib/docparse";
 
 const QUICK: { mode: Exclude<Mode, "ask" | "simplify">; icon: IconName }[] = [
   { mode: "explain", icon: "lightbulb" },
@@ -16,7 +17,6 @@ const QUICK: { mode: Exclude<Mode, "ask" | "simplify">; icon: IconName }[] = [
   { mode: "summarize", icon: "text" },
 ];
 
-const MAX_ATTACH = 60_000;
 const MAX_IMAGES = 2;
 
 // Minimal typing for the Web Speech API (not in lib.dom for all TS versions)
@@ -54,7 +54,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ on
   const [mode, setMode] = useState<Mode>("ask");
   const [attachment, setAttachment] = useState<{ name: string; text: string } | null>(null);
   const [images, setImages] = useState<PreparedImage[]>([]);
-  const [preparing, setPreparing] = useState(false);
+  const [preparing, setPreparing] = useState<false | "image" | "document">(false);
   const [listening, setListening] = useState(false);
   const ta = useRef<HTMLTextAreaElement>(null);
   const file = useRef<HTMLInputElement>(null);
@@ -132,7 +132,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ on
       return;
     }
     if (files.length > room) toast(`Only the first ${room} image${room > 1 ? "s" : ""} will be attached.`);
-    setPreparing(true);
+    setPreparing("image");
     try {
       const prepared: PreparedImage[] = [];
       for (const f of files.slice(0, room)) prepared.push(await prepareImage(f, f.name || "Pasted image"));
@@ -161,26 +161,17 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ on
     }
     const f = all[0];
     if (!f) return;
-    const okType = /\.(txt|md|markdown|csv|json|tex)$/i.test(f.name) || f.type.startsWith("text/");
-    if (!okType) {
-      toast("OLIS Beta reads photos (JPEG, PNG, WebP) and text files (.txt, .md, .csv). PDF support is coming later.", "error");
-      return;
-    }
+    setPreparing("document");
     try {
-      let content = await f.text();
-      if (!content.trim()) {
-        toast("That file looks empty.", "error");
-        return;
-      }
-      if (content.length > MAX_ATTACH) {
-        content = content.slice(0, MAX_ATTACH);
-        toast(`Large file: using the first ${MAX_ATTACH.toLocaleString()} characters.`);
-      }
-      setAttachment({ name: f.name, text: content });
+      const doc = await readDocument(f);
+      setAttachment({ name: f.name, text: doc.text });
+      for (const n of doc.notes) toast(n);
       if (!text.trim()) setMode("summarize");
       ta.current?.focus();
-    } catch {
-      toast("Couldn't read that file.", "error");
+    } catch (e) {
+      toast(e instanceof DocError ? e.message : "Couldn't read that file.", "error");
+    } finally {
+      setPreparing(false);
     }
   };
 
@@ -251,7 +242,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ on
                 </button>
               </span>
             ))}
-            {preparing && <span className="text-xs text-faint">Preparing image…</span>}
+            {preparing && <span className="text-xs text-faint">{preparing === "document" ? "Reading document…" : "Preparing image…"}</span>}
             {attachment && (
               <span className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-line bg-surface-2 px-2.5 py-1 text-xs text-muted">
                 <Icon name="file" size={13} />
@@ -286,7 +277,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ on
             type="file"
             multiple
             className="hidden"
-            accept={`${IMAGE_ACCEPT},.txt,.md,.markdown,.csv,.json,.tex,text/*`}
+            accept={`${IMAGE_ACCEPT},${DOC_ACCEPT}`}
             onChange={(e) => {
               void onFile(e.target.files);
               e.target.value = "";

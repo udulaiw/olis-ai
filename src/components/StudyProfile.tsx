@@ -3,14 +3,8 @@
 import { useState, type KeyboardEvent } from "react";
 import { useStore } from "../store/AppStore";
 import { Icon } from "./Icon";
-import { cx } from "../lib/utils";
-import { EXAM_LEVELS, LANGUAGES, PROFILE_SUBJECTS, STREAMS, type Depth } from "../types";
+import { EXAM_LEVELS, PROFILE_SUBJECTS, STREAMS } from "../types";
 
-const DEPTHS: { id: Depth; label: string; hint: string }[] = [
-  { id: "quick", label: "Quick", hint: "Key idea + essential steps" },
-  { id: "standard", label: "Standard", hint: "Idea, working, done" },
-  { id: "deep", label: "Deep", hint: "Full derivations + exam traps" },
-];
 
 function Field({ label, hint, children, htmlFor }: { label: string; hint?: string; children: React.ReactNode; htmlFor?: string }) {
   return (
@@ -94,15 +88,6 @@ export function StudyProfileEditor() {
             ))}
           </select>
         </Field>
-        <Field label="Answer language" htmlFor="pf-lang">
-          <div className="segmented w-full" role="group" aria-label="Answer language" id="pf-lang">
-            {LANGUAGES.map((l) => (
-              <button key={l.id} type="button" className="flex-1 justify-center" aria-pressed={p.language === l.id} onClick={() => setProfile({ language: l.id })}>
-                {l.label}
-              </button>
-            ))}
-          </div>
-        </Field>
       </div>
 
       <Field label="Subjects">
@@ -116,22 +101,6 @@ export function StudyProfileEditor() {
         </div>
       </Field>
 
-      <Field label="Explanation depth">
-        <div className="grid grid-cols-3 gap-2">
-          {DEPTHS.map((d) => (
-            <button
-              key={d.id}
-              type="button"
-              aria-pressed={p.depth === d.id}
-              onClick={() => setProfile({ depth: d.id })}
-              className={cx("rounded-xl border px-3 py-2.5 text-left transition", p.depth === d.id ? "border-accent/60 bg-accent-soft" : "border-line hover:border-line-strong")}
-            >
-              <span className="block text-sm font-medium">{d.label}</span>
-              <span className="block text-[11.5px] leading-snug text-faint">{d.hint}</span>
-            </button>
-          ))}
-        </div>
-      </Field>
 
       <div className="grid gap-5 sm:grid-cols-2">
         <Field label="Current topic" htmlFor="pf-topic">

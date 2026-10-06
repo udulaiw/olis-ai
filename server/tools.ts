@@ -5,8 +5,13 @@ import type { ToolDef } from "./ai/types.js";
 import { searchKnowledge, relevantHits } from "./rag.js";
 import { expandQuery } from "./lang/nlp.mjs";
 import { mathCheck, MATH_OPS } from "./mathcheck.js";
+import { searchWikipedia, type WikiLang } from "./sources/wikipedia.js";
+import { lookupWikidata } from "./sources/wikidata.js";
+import { searchOpenAlex, searchArxiv, lookupDoi, type Paper } from "./sources/research.js";
+import { SourceError } from "./sources/http.js";
+import { aiLog } from "./ai/log.js";
 
-export type SourceKind = "notes" | "paper" | "wikipedia" | "web";
+export type SourceKind = "notes" | "paper" | "document" | "wikipedia" | "wikidata" | "research" | "web";
 export interface Source {
   ref: number;
   kind: SourceKind;
@@ -36,7 +41,7 @@ const t = (ms: number) => AbortSignal.timeout(ms);
 const sig = (ms: number, outer?: AbortSignal) => (outer ? AbortSignal.any([outer, t(ms)]) : t(ms));
 const clip = (s: string, n: number) => (s.length > n ? s.slice(0, n).trimEnd() + "…" : s);
 
-export function toolDeclarations(cfg: Config): ToolDef[] {
+export function toolDeclarations(cfg: Config, opts: { research?: boolean } = {}): ToolDef[] {
   const decls: ToolDef[] = [
     {
       name: "search_knowledge_base",
@@ -77,10 +82,38 @@ export function toolDeclarations(cfg: Config): ToolDef[] {
     },
     {
       name: "search_wikipedia",
-      description: "Search Wikipedia for encyclopedic background on a concept, person, event or definition. Returns numbered article summaries.",
-      parameters: { type: "object", properties: { query: { type: "string", description: "Search terms" } }, required: ["query"] },
+      description:
+        "Search Wikipedia for encyclopedic background on a concept, person, place, event or definition that the OLIS notes don't cover. Returns numbered article summaries (and a free Wikimedia Commons image link when the article has one). Use language 'si' or 'ta' only for Sri Lankan topics better covered in Sinhala/Tamil Wikipedia; English otherwise.",
+      parameters: {
+        type: "object",
+        properties: { query: { type: "string", description: "Search terms" }, language: { type: "string", enum: ["en", "si", "ta"], description: "Wikipedia edition, default en" } },
+        required: ["query"],
+      },
+    },
+    {
+      name: "lookup_facts",
+      description:
+        "Look up exact structured facts about ONE named thing on Wikidata: a person (born, died, discoveries, awards), a place (country, capital, population, area, elevation), a planet or star (discoverer, discovery date, mass, radius, orbital period), a chemical element or compound (atomic number, symbol, formula, melting/boiling point), an event (date, location). Use for 'who discovered…', 'when was…', 'what is the population/capital/atomic number of…'. Not for explanations.",
+      parameters: { type: "object", properties: { entity: { type: "string", description: "The name of the thing, e.g. 'Neptune', 'Isaac Newton', 'sodium'" } }, required: ["entity"] },
     },
   ];
+  if (opts.research) {
+    decls.push({
+      name: "search_research",
+      description:
+        "Find real academic papers (OpenAlex; arXiv for preprints; Crossref for a DOI). Only for requests about research, scientific papers or studies. Returns numbered paper titles, authors, year, venue and abstract snippets with links. Never invent papers.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Research topic in English keywords" },
+          source: { type: "string", enum: ["openalex", "arxiv"], description: "Default openalex; arxiv for preprints" },
+          doi: { type: "string", description: "A DOI to look up instead of searching" },
+          from_year: { type: "string", description: "Only papers from this year onwards, e.g. 2020" },
+        },
+        required: ["query"],
+      },
+    });
+  }
   if (cfg.tavilyKey) {
     decls.push({
       name: "search_web",
@@ -110,8 +143,15 @@ export async function runTool(
   name: string,
   args: Record<string, unknown>,
   reg: SourceRegistry,
-  ctx: { subject?: string; signal?: AbortSignal; level?: "OL" | "AL" | null },
+  ctx: { subject?: string; signal?: AbortSignal; level?: "OL" | "AL" | null; requestId?: string },
 ): Promise<ToolRun> {
+  const logSource = (source: string, ok: boolean, cachedHit: boolean, hits: number) => aiLog({ evt: "ai.source", requestId: ctx.requestId, source, ok, cached: cachedHit, hits });
+  const failed = (label: string, source: string, e: unknown): ToolRun => {
+    if ((e as Error)?.name === "AbortError" && ctx.signal?.aborted) throw e;
+    logSource(source, false, false, 0);
+    const why = e instanceof SourceError ? e.message : "unavailable";
+    return { label, sources: [], result: { error: `${source} is unavailable right now (${why}). Answer from the OLIS notes or your own knowledge, labelled as such, or try another source.` } };
+  };
   const q = String(args.query ?? "").slice(0, 200);
   switch (name) {
     case "math_check": {
@@ -167,17 +207,84 @@ export async function runTool(
     }
 
     case "search_wikipedia": {
-      const url = `${cfg.wikipediaBase}/w/api.php?action=query&format=json&origin=*&generator=search&gsrsearch=${encodeURIComponent(q)}&gsrlimit=3&prop=extracts|info&exintro=1&explaintext=1&exchars=1200&inprop=url`;
-      const res = await fetch(url, { headers: { "User-Agent": UA }, signal: sig(8000, ctx.signal) });
-      if (!res.ok) return { label: `Searching Wikipedia: “${q}”`, sources: [], result: { error: `Wikipedia unavailable (${res.status})` } };
-      const data = (await res.json()) as { query?: { pages?: Record<string, { title: string; extract?: string; fullurl?: string; index?: number }> } };
-      const pages = Object.values(data.query?.pages ?? {}).sort((a, b) => (a.index ?? 0) - (b.index ?? 0)).filter((p) => p.extract);
-      const sources = pages.map((p) => reg.add({ kind: "wikipedia", title: p.title, url: p.fullurl ?? `https://en.wikipedia.org/wiki/${encodeURIComponent(p.title)}`, snippet: clip(p.extract!, 180) }));
-      return {
-        label: `Searching Wikipedia: “${q}”`,
-        sources,
-        result: pages.length ? { results: pages.map((p, i) => ({ ref: sources[i].ref, title: p.title, summary: clip(p.extract!, 1200) })) } : { results: [], note: "No Wikipedia results." },
+      const lang: WikiLang = args.language === "si" || args.language === "ta" ? args.language : "en";
+      const label = `Searching ${lang === "si" ? "Sinhala " : lang === "ta" ? "Tamil " : ""}Wikipedia: “${q}”`;
+      try {
+        const { pages, cached: hit } = await searchWikipedia(q, { lang, signal: ctx.signal });
+        logSource("wikipedia", true, hit, pages.length);
+        const sources = pages.map((p) => reg.add({ kind: "wikipedia", title: p.title, url: p.url, snippet: clip(p.summary, 180) }));
+        return {
+          label,
+          sources,
+          result: pages.length
+            ? { results: pages.map((p, i) => ({ ref: sources[i].ref, title: p.title, summary: p.summary, ...(p.image ? { image: `Free image on Wikimedia Commons: ${p.image.commons}` } : {}) })), licence: "Wikipedia text is CC BY-SA 4.0" }
+            : { results: [], note: "No Wikipedia results." },
+        };
+      } catch (e) {
+        return failed(label, "Wikipedia", e);
+      }
+    }
+
+    case "lookup_facts": {
+      const entity = String(args.entity ?? args.query ?? "").slice(0, 120);
+      const label = `Checking facts on Wikidata: “${entity}”`;
+      if (!entity.trim()) return { label, sources: [], result: { error: "No entity given." } };
+      try {
+        const { facts, cached: hit } = await lookupWikidata(entity, { signal: ctx.signal });
+        logSource("wikidata", true, hit, facts ? 1 : 0);
+        if (!facts || !facts.facts.length) return { label, sources: [], result: { results: [], note: "Wikidata has no matching item with usable facts. Try search_wikipedia." } };
+        const src = reg.add({ kind: "wikidata", title: `${facts.label} (Wikidata)`, url: facts.url, snippet: clip(facts.description, 180) });
+        return {
+          label,
+          sources: [src],
+          result: { ref: src.ref, item: facts.label, description: facts.description, facts: facts.facts.map((f) => `${f.property}: ${f.values.join("; ")}`), wikipedia: facts.wikipedia ?? null, note: "Dates are YYYY-MM-DD. Check that this item is the thing the student meant (see description)." },
+        };
+      } catch (e) {
+        return failed(label, "Wikidata", e);
+      }
+    }
+
+    case "search_research": {
+      const doi = typeof args.doi === "string" ? args.doi : "";
+      const fromYear = /^\d{4}$/.test(String(args.from_year ?? "")) ? Number(args.from_year) : undefined;
+      const wantArxiv = args.source === "arxiv";
+      const label = doi ? `Looking up DOI ${doi.slice(0, 60)}` : `Searching ${wantArxiv ? "arXiv" : "research papers"}: “${q}”`;
+      const toResult = (papers: Paper[], via: string): ToolRun => {
+        const sources = papers.map((p) => reg.add({ kind: "research", title: `${p.title}${p.year ? ` (${p.year})` : ""}`, url: p.url, snippet: clip([p.authors.join(", "), p.venue].filter(Boolean).join(" · "), 180) }));
+        return {
+          label,
+          sources,
+          result: papers.length
+            ? {
+                via,
+                results: papers.map((p, i) => ({ ref: sources[i].ref, title: p.title, year: p.year, authors: p.authors, venue: p.venue, doi: p.doi, cited_by: p.citedBy, abstract: p.abstract || "(no abstract available)", open_access_pdf: p.openAccessUrl ?? null })),
+                note: "Describe these as real papers found via the database; summarise only what the abstracts say.",
+              }
+            : { results: [], note: "No papers found. Say so; never invent papers." },
+        };
       };
+      try {
+        if (doi) {
+          const { paper, cached: hit } = await lookupDoi(doi, { signal: ctx.signal });
+          logSource("crossref", true, hit, paper ? 1 : 0);
+          if (paper) return toResult([paper], "Crossref");
+        }
+        if (!wantArxiv) {
+          try {
+            const { papers, cached: hit } = await searchOpenAlex(q, { fromYear, signal: ctx.signal });
+            logSource("openalex", true, hit, papers.length);
+            if (papers.length) return toResult(papers, "OpenAlex");
+          } catch (e) {
+            if ((e as Error)?.name === "AbortError" && ctx.signal?.aborted) throw e;
+            logSource("openalex", false, false, 0); // fall back to arXiv below
+          }
+        }
+        const { papers, cached: hit } = await searchArxiv(q, { signal: ctx.signal });
+        logSource("arxiv", true, hit, papers.length);
+        return toResult(papers, "arXiv");
+      } catch (e) {
+        return failed(label, "Research search", e);
+      }
     }
 
     case "search_web": {
