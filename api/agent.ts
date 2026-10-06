@@ -25,7 +25,9 @@ function parse(body: unknown): AgentRequest | null {
   }
   return {
     messages,
-    attachment: str(b.attachment, 40000) || undefined,
+    // A whole PDF/DOCX extracted in the browser (≤ 200k chars); the server picks the passages each question needs
+    attachment: str(b.attachment, 220_000) || undefined,
+    attachmentName: str(b.attachmentName, 120).replace(/[\u0000-\u001f<>"]/g, " ").trim() || undefined,
     images: images.length ? images : undefined,
     mode: MODES.has(String(b.mode)) ? String(b.mode) : "ask",
     context: parseContext(b.context),
@@ -45,7 +47,7 @@ function parse(body: unknown): AgentRequest | null {
 
 export async function POST(request: Request): Promise<Response> {
   const cfg = config();
-  const g = await guard(request, cfg, "agent", { maxBytes: 3_200_000, daily: true });
+  const g = await guard(request, cfg, "agent", { maxBytes: 4_200_000, daily: true });
   if (g instanceof Response) return g;
   const req = parse(g.body);
   if (!req) return errorJson(400, "bad_request", "Send at least one user message (images: JPEG/PNG/WebP, max 2).");

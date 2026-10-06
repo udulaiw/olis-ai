@@ -22,6 +22,8 @@ import { createScriptGuard, repairIndicToSinhala } from "./lang/unicode.mjs";
 import type { ChatMessage, ImageInput, ToolCall } from "./ai/types.js";
 import { extractMemories, selectMemories, languageFromMemory, levelFromMemory, type MemoryItem } from "./memory.js";
 import { fetchLive, type LiveResult } from "./live/tools.js";
+import { selectDocPassages, pageLabel } from "./docs/retrieve.js";
+import { RESEARCH_CUE } from "./sources/research.js";
 
 export type AgentEvent =
   | { type: "step"; id: string; label: string; status: "running" | "done" | "failed" }
@@ -63,6 +65,8 @@ export interface RecallItem {
 export interface AgentRequest {
   messages: { role: "user" | "assistant"; content: string }[];
   attachment?: string;
+  /** File name of the attached document (for citations). */
+  attachmentName?: string;
   images?: ImageInput[];
   mode: string;
   context: LearningContext;
@@ -86,6 +90,10 @@ function stepLabel(call: ToolCall) {
       return `Searching the web: “${a.query}”`;
     case "search_past_papers":
       return `Checking past papers: “${a.query}”`;
+    case "lookup_facts":
+      return `Checking facts on Wikidata: “${a.entity ?? a.query}”`;
+    case "search_research":
+      return a.doi ? `Looking up DOI ${a.doi}` : `Searching research papers: “${a.query}”`;
     case "math_check":
       return "Checking the maths";
     case "read_webpage":
@@ -103,9 +111,10 @@ export async function* runAgent(cfg: Config, req: AgentRequest, signal?: AbortSi
   const requestId = newRequestId();
   const deadline = Date.now() + cfg.agentDeadlineMs;
   const reg = new SourceRegistry();
-  const decls = toolDeclarations(cfg);
   const history = req.messages.slice(0, -1).slice(-12);
   const question = req.messages[req.messages.length - 1]?.content ?? "";
+  // Academic search is only offered when the student asks for research / papers / studies (smart source routing)
+  const decls = toolDeclarations(cfg, { research: RESEARCH_CUE.test(question) });
   const t0 = Date.now();
   const toolsUsed: string[] = [];
   const memoryOn = req.memoryEnabled !== false;
@@ -120,7 +129,8 @@ export async function* runAgent(cfg: Config, req: AgentRequest, signal?: AbortSi
     mode: req.mode,
     subject: req.context.subject,
     imageCount: req.images?.length ?? 0,
-    attachmentChars: req.attachment?.length ?? 0,
+    // Only the selected passages (≤ ~14k chars) reach the model, so a big PDF is not "long context" any more
+    attachmentChars: Math.min(req.attachment?.length ?? 0, 16_000),
     languagePref,
     history,
     stream: req.profile?.stream,
@@ -188,8 +198,25 @@ export async function* runAgent(cfg: Config, req: AgentRequest, signal?: AbortSi
     // Literature: when the question names a work OLIS has notes on, filter to that work first (metadata before ranking), then fall back
     let found = cls.work ? await searchKnowledge(cfg, cls.retrievalQuery, { k: 4, subject: req.context.subject, signal, level: cls.examLevel, work: cls.work }).catch(() => []) : [];
     if (!found.length) found = await searchKnowledge(cfg, cls.retrievalQuery, { k: 4, subject: req.context.subject, signal, level: cls.examLevel }).catch(() => []);
+    // Weak or no match: retry once with a broader query built from the detected topic / subject (e.g. a long
+    // worded question whose key term is missing from the notes, but the topic is covered)
+    const rank = { strong: 2, weak: 1, none: 0 } as const;
+    let broadened = false;
+    if (groundingOf(found) !== "strong" && cls.topicName) {
+      const broader = `${cls.topicName} ${cls.subjectName ?? ""}`.trim();
+      if (broader.toLowerCase() !== cls.retrievalQuery.toLowerCase()) {
+        const again = await searchKnowledge(cfg, broader, { k: 4, subject: req.context.subject, signal, level: cls.examLevel }).catch(() => []);
+        if (rank[groundingOf(again)] > rank[groundingOf(found)]) {
+          found = again;
+          broadened = true;
+          toolsUsed.push("rag_broadened");
+        }
+      }
+    }
     // Hits that only matched generic words ("marks", "question") are not evidence: don't show them or let the model cite them
     if (!req.attachment) grounding = groundingOf(found);
+    // Topic-level matches are related reading, not proof of THIS answer: never more than "weak"
+    if (broadened && grounding === "strong") grounding = "weak";
     // ...and when the verdict is "none", the incidental matches are not shown either (the model can still call search_knowledge_base itself)
     const hits = grounding === "none" ? [] : relevantHits(found);
     aiLog({ evt: "ai.retrieval", requestId, route: "agent", grounding: grounding ?? "n/a", hits: hits.length, level: cls.examLevel ?? "unknown", specialist: cls.specialist, reply: cls.reply, subject: cls.subject ?? "none", intent: cls.intent, difficulty: cls.difficulty });
@@ -218,6 +245,38 @@ export async function* runAgent(cfg: Config, req: AgentRequest, signal?: AbortSi
           })
           .join("\n\n---\n\n") +
         "\n</knowledge_excerpts>";
+    }
+  }
+
+  // 1b) The student's attached document: pick the passages this question needs (with real page numbers)
+  let docBlock = "";
+  if (req.attachment) {
+    const id = `s${++stepN}`;
+    const name = (req.attachmentName || "attached document").replace(/[<>"]/g, "").slice(0, 100);
+    yield { type: "step", id, label: `Reading ${name}`, status: "running" };
+    try {
+      const sel = await selectDocPassages(req.attachment, question, { name, mode: req.mode, signal, history: history.filter((m) => m.role === "user").slice(-1)[0]?.content.slice(0, 300) });
+      const refs = sel.passages.map((p) =>
+        reg.add({
+          kind: "document",
+          title: `${name} · ${[pageLabel(p.pages), p.question ? `Q${p.question}` : "", p.heading !== "Overview" ? p.heading : ""].filter(Boolean).join(" · ") || "excerpt"}`,
+          url: null,
+          snippet: clip(p.text, 180),
+        }),
+      );
+      if (refs.length) yield { type: "sources", sources: [...reg.list] };
+      const label =
+        sel.strategy === "whole" ? `Read ${name}` : sel.strategy === "overview" ? `Read ${name} (${sel.passages.length} sections across the document)` : sel.strategy === "search" ? `Found ${sel.passages.length} relevant part${sel.passages.length === 1 ? "" : "s"} of ${name}` : `Nothing in ${name} matched; using an overview`;
+      yield { type: "step", id, label, status: "done" };
+      aiLog({ evt: "ai.document", requestId, route: "agent", strategy: sel.strategy, chunks: sel.chunks, used: sel.passages.length, pages: sel.hasPages ? "yes" : "no" });
+      docBlock = [
+        `<student_document name="${name}" pages="${sel.hasPages ? "known" : "none"}" coverage="${sel.strategy === "whole" ? "complete" : sel.strategy === "overview" ? "spread across the whole document" : sel.strategy === "search" ? "only the parts relevant to this question" : "overview; no part matched the question"}">`,
+        sel.passages.map((p, i) => `[${refs[i].ref}]${p.pages ? ` (${pageLabel(p.pages)})` : ""}${p.question ? ` Q${p.question}` : ""} ${p.heading}\n${p.text}`).join("\n\n---\n\n"),
+        `</student_document>`,
+      ].join("\n");
+    } catch {
+      yield { type: "step", id, label: `Couldn't process ${name}; using its beginning`, status: "failed" };
+      docBlock = `<student_document name="${name}">\n${clip(req.attachment.replace(/\[p\.\d+\] ?/g, ""), 20000)}\n</student_document>`;
     }
   }
 
@@ -277,7 +336,7 @@ export async function* runAgent(cfg: Config, req: AgentRequest, signal?: AbortSi
     memoryBlock,
     historyBlock,
     kbBlock,
-    req.attachment ? `<student_document>\n${clip(req.attachment, 30000)}\n</student_document>` : "",
+    docBlock,
     hasImages ? `(The student attached ${req.images!.length} image${req.images!.length > 1 ? "s" : ""}, e.g. a photo of a question or their working. Read it carefully.)` : "",
     kbBlock || liveBlock || memoryBlock || historyBlock || req.attachment || hasImages ? `STUDENT'S MESSAGE:\n${question || "Please help me with the attached."}` : question,
   ]
@@ -391,7 +450,7 @@ export async function* runAgent(cfg: Config, req: AgentRequest, signal?: AbortSi
       yield { type: "step", id, label: pending, status: "running" };
       let result: Record<string, unknown>;
       try {
-        const run = await runTool(cfg, call.name, call.args, reg, { subject: req.context.subject, signal, level: cls.examLevel });
+        const run = await runTool(cfg, call.name, call.args, reg, { subject: req.context.subject, signal, level: cls.examLevel, requestId });
         result = run.result;
         yield { type: "step", id, label: run.label, status: result.error ? "failed" : "done" };
         if (run.sources.length) yield { type: "sources", sources: [...reg.list] };

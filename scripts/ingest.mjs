@@ -27,7 +27,8 @@ import { join, extname, basename, resolve, relative } from "node:path";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
-import { cleanSinhala, repairMojibake, scriptStats, scanText, fixVisualOrder, looksLikeLegacySinhalaFont } from "../server/lang/unicode.mjs";
+import { scriptStats, scanText, looksLikeLegacySinhalaFont } from "../server/lang/unicode.mjs";
+import { linesFromItems, dropRunningLines, pagesToMarkdown, cleanLine, looksScanned } from "../server/docs/pdflayout.mjs";
 
 const args = process.argv.slice(2);
 const flag = (n) => args.includes(`--${n}`);
@@ -96,18 +97,10 @@ async function extract(path) {
   for (let n = 1; n <= doc.numPages; n++) {
     const page = await doc.getPage(n);
     const tc = await page.getTextContent();
-    // group by visual line (y), then read left→right
-    const rows = new Map();
-    for (const it of tc.items) {
-      if (!("str" in it) || !it.str) continue;
-      const y = Math.round(it.transform[5] / 3);
-      (rows.get(y) ?? rows.set(y, []).get(y)).push(it);
-    }
-    const lines = [...rows.entries()].sort((a, b) => b[0] - a[0]).map(([, items]) => items.sort((a, b) => a.transform[4] - b.transform[4]).map((i) => i.str).join(" ").replace(/\s+/g, " ").trim());
-    pages.push(lines.filter(Boolean));
+    pages.push(linesFromItems(tc.items)); // shared with the in-chat PDF reader (server/docs/pdflayout.mjs)
   }
   await task.destroy();
-  return pages; // string[][]
+  return pages; // { text, size }[][]
 }
 
 function ocr(path) {
@@ -119,40 +112,9 @@ function ocr(path) {
   if (r.status !== 0) return { error: "pdftoppm failed" };
   const pages = readdirSync(dir).filter((f) => f.endsWith(".png")).sort().map((f) => {
     const t = spawnSync("tesseract", [join(dir, f), "stdout", "-l", lang], { encoding: "utf8", maxBuffer: 20_000_000 });
-    return (t.stdout ?? "").split("\n").map((l) => l.trim()).filter(Boolean);
+    return (t.stdout ?? "").split("\n").map((l) => l.trim()).filter(Boolean).map((text) => ({ text, size: 0 }));
   });
   return { pages, lang };
-}
-
-// ── clean-up helpers ────────────────────────────────────────
-function dropRunningLines(pages) {
-  if (pages.length < 4) return pages;
-  const seen = new Map();
-  for (const p of pages) for (const l of new Set([...p.slice(0, 2), ...p.slice(-2)])) seen.set(l.replace(/\d+/g, "#"), (seen.get(l.replace(/\d+/g, "#")) ?? 0) + 1);
-  const repeated = new Set([...seen].filter(([, c]) => c >= Math.max(3, pages.length * 0.5)).map(([l]) => l));
-  return pages.map((p) => p.filter((l, i) => !((i < 2 || i >= p.length - 2) && repeated.has(l.replace(/\d+/g, "#"))) && !/^\d{1,4}$/.test(l)));
-}
-const HEADING = /^(unit|chapter|lesson|topic|section|competency|ඒකකය|පාඩම|පරිච්ඡේදය|විෂය කරුණු)\b/i;
-function pageText(lines, pageNo) {
-  const out = [];
-  let para = "";
-  let marked = false;
-  const mark = (t) => (marked ? t : ((marked = true), `[p.${pageNo}] ${t}`)); // the marker rides on the first body paragraph, after any heading
-  const flush = () => {
-    if (para) out.push(mark(para.trim()));
-    para = "";
-  };
-  for (const l of lines) {
-    if (HEADING.test(l) && l.length < 90) {
-      flush();
-      out.push(`## ${l}`);
-    } else if (/^([•\-–*]|\d+[.)]|\([a-z0-9]+\))\s/.test(l)) {
-      flush();
-      out.push(mark(l));
-    } else para = para.endsWith("-") ? para.slice(0, -1) + l : para ? `${para} ${l}` : l;
-  }
-  flush();
-  return out.join("\n\n");
 }
 
 // ── run ─────────────────────────────────────────────────────
@@ -176,10 +138,9 @@ for (const f of pdfs) {
     report.push({ file: f.name, status: "corrupt", reason: String(e?.message ?? e).slice(0, 120) });
     continue;
   }
-  let totalChars = pages.flat().join("").length;
   let usedOcr = null;
-  const scanned = totalChars / Math.max(1, pages.length) < 40;
-  let sample = pages.flat().join(" ");
+  const scanned = looksScanned(pages);
+  let sample = pages.flat().map((l) => l.text).join(" ");
   const legacy = !scanned && looksLikeLegacySinhalaFont(sample);
   if (scanned || legacy) {
     if (wantOcr) {
@@ -190,8 +151,7 @@ for (const f of pdfs) {
       }
       pages = r.pages;
       usedOcr = r.lang;
-      sample = pages.flat().join(" ");
-      totalChars = sample.length;
+      sample = pages.flat().map((l) => l.text).join(" ");
     } else {
       report.push({ file: f.name, status: scanned ? "needs_ocr" : "legacy_font", reason: scanned ? "no text layer (scanned). Re-run with --ocr" : "old Sinhala font (FM Abhaya / Kandy…): text extracts as garbage. Re-run with --ocr (language data: sin)" });
       continue;
@@ -201,13 +161,12 @@ for (const f of pdfs) {
   let orderFixes = 0;
   const cleaned = dropRunningLines(pages).map((lines) =>
     lines.map((l) => {
-      const m = repairMojibake(l).text;
-      const v = fixVisualOrder(cleanSinhala(m));
-      orderFixes += v.fixed;
-      return v.text;
+      const c = cleanLine(l.text);
+      orderFixes += c.fixed;
+      return { text: c.text, size: l.size };
     }),
   );
-  const body = cleaned.map((lines, i) => (lines.length ? pageText(lines, i + 1) : "")).filter(Boolean).join("\n\n");
+  const body = pagesToMarkdown(cleaned);
   const textHash = sha(body.toLowerCase().replace(/\W+/g, ""));
   if (seenText.has(textHash)) {
     report.push({ file: f.name, status: "duplicate", reason: `same text as ${seenText.get(textHash)} (re-saved copy)` });

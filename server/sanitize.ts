@@ -3,6 +3,7 @@
 // characters that could be used to fake prompt structure.
 import type { LearningContext, StudentProfile } from "./prompts.js";
 import type { ImageInput } from "./ai/types.js";
+import { isPersonality } from "./personality.js";
 
 import { cleanSinhala } from "./lang/unicode.mjs";
 
@@ -35,6 +36,7 @@ export function parseProfile(v: unknown): StudentProfile | undefined {
     weakTopics: list(p.weakTopics, 8, 60),
     goals: line(p.goals, 200) || undefined,
     examLevel: p.examLevel === "OL" || p.examLevel === "AL" ? p.examLevel : undefined,
+    personality: isPersonality(p.personality) && p.personality !== "normal" ? p.personality : undefined,
   };
   return Object.values(profile).some((x) => (Array.isArray(x) ? x.length : x)) ? profile : undefined;
 }

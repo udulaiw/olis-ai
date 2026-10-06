@@ -7,7 +7,10 @@ import { cx } from "../lib/utils";
 const KIND: Record<Source["kind"], { label: string; icon: IconName; cls: string }> = {
   notes: { label: "OLIS notes", icon: "book", cls: "text-accent" },
   paper: { label: "Past paper", icon: "file", cls: "text-accent" },
+  document: { label: "Your document", icon: "file", cls: "text-accent" },
   wikipedia: { label: "Wikipedia", icon: "text", cls: "text-lavender" },
+  wikidata: { label: "Wikidata", icon: "text", cls: "text-lavender" },
+  research: { label: "Research paper", icon: "book", cls: "text-lavender" },
   web: { label: "Web", icon: "search", cls: "text-muted" },
 };
 

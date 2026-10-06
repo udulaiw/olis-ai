@@ -112,8 +112,60 @@ export function catalog(): ModelSpec[] {
       dailyBudget: 100,
     },
 
-    // Local model (optional, e.g. Ollama / LM Studio). Only useful in `npm run dev`:
-    // a Vercel function can't reach your laptop.
+    // ── Official free tiers (Oct 2026; see providers/index.ts). Groq, Cerebras and Mistral support
+    //    OpenAI-style tool calling, so they can run the full research loop when Gemini is busy.
+    {
+      key: "groq-70b",
+      provider: "groq",
+      model: env("GROQ_MODEL") || "llama-3.3-70b-versatile",
+      tier: "free",
+      capabilities: ["text", "tools", "json", "multilingual"],
+      contextTokens: 128_000,
+      dailyBudget: 800,
+      notes: "Groq production model; very fast. Free plan limits are per model.",
+    },
+    {
+      key: "groq-reasoning",
+      provider: "groq",
+      model: env("GROQ_REASONING_MODEL") || "openai/gpt-oss-120b",
+      tier: "free",
+      capabilities: ["text", "tools", "json", "reasoning"],
+      contextTokens: 128_000,
+      dailyBudget: 500,
+    },
+    {
+      key: "cerebras",
+      provider: "cerebras",
+      model: env("CEREBRAS_MODEL") || "gpt-oss-120b",
+      tier: "free",
+      capabilities: ["text", "tools", "json", "reasoning"],
+      contextTokens: 64_000,
+      dailyBudget: 500,
+      notes: "Free tier context is 64k on Cerebras shared inference.",
+    },
+    {
+      key: "mistral",
+      provider: "mistral",
+      model: env("MISTRAL_MODEL") || "mistral-small-latest",
+      tier: "free",
+      capabilities: ["text", "tools", "json", "multilingual"],
+      contextTokens: 128_000,
+      dailyBudget: 300,
+      notes: "Experiment (free) plan. Free-plan data may be used for training unless you opt out.",
+    },
+    {
+      key: "openrouter-free",
+      provider: "openrouter",
+      model: env("OPENROUTER_MODEL") || "openrouter/free",
+      tier: "free",
+      capabilities: ["text"],
+      contextTokens: 32_000,
+      dailyBudget: 45,
+      notes: "OpenRouter's free-models router. 50 requests/day without credits, so it's a last resort.",
+    },
+
+    // Open-source model server (optional): Ollama / Ollama Cloud / LM Studio / vLLM / HF endpoint.
+    // Must be reachable from the internet when deployed (a Vercel function can't reach your laptop).
     {
       key: "local",
       provider: "local",
@@ -131,17 +183,19 @@ export function catalog(): ModelSpec[] {
 // configured, that lack a required capability, are cooling down after a
 // rate limit, or are blocked by Free Beta are skipped automatically.
 export const ROUTES: Record<Task, string[]> = {
-  // NVIDIA order reflects live tests (Sep 2026): Nemotron answers in <1 s on the
-  // free tier; DeepSeek / gpt-oss often queue for 25 s+, so they come last.
-  general: ["gemini-fast", "gemini-reasoning", "gemini-backup", "nvidia-nemotron", "nvidia-fast", "nvidia-reasoning", "local"],
-  reasoning: ["gemini-reasoning", "gemini-backup", "nvidia-nemotron", "gemini-fast", "nvidia-reasoning", "local"],
-  mathematics: ["gemini-reasoning", "gemini-backup", "nvidia-nemotron", "gemini-fast", "nvidia-reasoning", "local"],
-  physics: ["gemini-reasoning", "gemini-backup", "nvidia-nemotron", "gemini-fast", "nvidia-reasoning", "local"],
-  chemistry: ["gemini-reasoning", "gemini-fast", "gemini-backup", "nvidia-nemotron", "nvidia-reasoning", "local"],
+  // Gemini first (tools, vision, best Sinhala). Then official free tiers with production terms (Groq, Cerebras),
+  // then NVIDIA (free for evaluation), Mistral, OpenRouter's free router, and finally your own open-source server.
+  // NVIDIA order reflects live tests (Sep 2026): Nemotron answers in <1 s on the free tier; DeepSeek / gpt-oss queue longer.
+  general: ["gemini-fast", "gemini-reasoning", "gemini-backup", "groq-70b", "cerebras", "nvidia-nemotron", "nvidia-fast", "mistral", "nvidia-reasoning", "openrouter-free", "local"],
+  reasoning: ["gemini-reasoning", "gemini-backup", "groq-reasoning", "cerebras", "nvidia-nemotron", "gemini-fast", "nvidia-reasoning", "mistral", "openrouter-free", "local"],
+  mathematics: ["gemini-reasoning", "gemini-backup", "groq-reasoning", "cerebras", "nvidia-nemotron", "gemini-fast", "nvidia-reasoning", "mistral", "openrouter-free", "local"],
+  physics: ["gemini-reasoning", "gemini-backup", "groq-reasoning", "cerebras", "nvidia-nemotron", "gemini-fast", "nvidia-reasoning", "mistral", "openrouter-free", "local"],
+  chemistry: ["gemini-reasoning", "gemini-fast", "gemini-backup", "groq-reasoning", "cerebras", "nvidia-nemotron", "nvidia-reasoning", "mistral", "openrouter-free", "local"],
   vision: ["gemini-reasoning", "gemini-fast", "gemini-backup", "nvidia-vision"],
-  sinhala: ["gemini-reasoning", "gemini-fast", "gemini-backup", "nvidia-nemotron", "nvidia-reasoning"],
-  long_context: ["gemini-fast", "gemini-reasoning", "gemini-backup", "nvidia-nemotron", "nvidia-reasoning"],
-  structured: ["gemini-fast", "gemini-reasoning", "gemini-backup", "nvidia-nemotron", "nvidia-fast", "local"],
+  // Sinhala: open models are weaker; Gemini first, then the strongest multilingual fallbacks (the script guard still checks every answer)
+  sinhala: ["gemini-reasoning", "gemini-fast", "gemini-backup", "groq-70b", "nvidia-nemotron", "mistral", "nvidia-reasoning"],
+  long_context: ["gemini-fast", "gemini-reasoning", "gemini-backup", "groq-70b", "nvidia-nemotron", "mistral", "nvidia-reasoning"],
+  structured: ["gemini-fast", "gemini-reasoning", "gemini-backup", "groq-70b", "cerebras", "nvidia-nemotron", "nvidia-fast", "mistral", "local"],
 };
 
 // ── Free Beta ──────────────────────────────────
@@ -159,7 +213,12 @@ export const ROUTES: Record<Task, string[]> = {
 export const FREE_BETA_ALLOWLIST: Record<ProviderId, string[]> = {
   gemini: ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-3-flash-preview", "gemini-2.5-flash", "gemini-2.5-pro"],
   nvidia: ["deepseek-ai/deepseek-v4.1-flash", "openai/gpt-oss-20b", "meta/llama-3.2-90b-vision-instruct", "meta/llama-3.2-11b-vision-instruct", "nvidia/nemotron-3-super-120b-a12b"],
-  local: ["*"], // runs on your own machine: always $0
+  groq: ["llama-3.3-70b-versatile", "openai/gpt-oss-120b", "openai/gpt-oss-20b", "llama-3.1-8b-instant"],
+  cerebras: ["gpt-oss-120b", "qwen-3.8-27b"],
+  mistral: ["mistral-small-latest", "mistral-medium-latest", "mistral-large-latest"],
+  // Only OpenRouter's zero-cost models: the free router, or any model ID ending in ":free" (see policy.ts)
+  openrouter: ["openrouter/free", "*:free"],
+  local: ["*"], // your own server: always $0 to OLIS
 };
 
 /** Model-name patterns that are never allowed in Free Beta, whatever the allowlist says. */

@@ -26,6 +26,15 @@ export const LANGUAGES: { id: Language; label: string }[] = [
 ];
 
 export type Depth = "quick" | "standard" | "deep";
+/** Settings → Response length. Same values the server has always used for "depth". */
+export const RESPONSE_LENGTHS: { id: Depth; label: string; hint: string }[] = [
+  { id: "quick", label: "Concise", hint: "Key idea + essential steps" },
+  { id: "standard", label: "Balanced", hint: "Idea, working, done" },
+  { id: "deep", label: "Detailed", hint: "Full working + exam traps" },
+];
+
+export { PERSONALITIES, PERSONALITY_IDS, type PersonalityId } from "../server/personality";
+import type { PersonalityId } from "../server/personality";
 
 /** Which G.C.E. exam the student is preparing for ("" = not set). */
 export type ExamLevel = "" | "OL" | "AL";
@@ -48,6 +57,8 @@ export interface StudyProfile {
   weakTopics: string[];
   goals: string;
   examLevel?: ExamLevel;
+  /** How OLIS talks (Settings → AI Personality). Style only, never facts. */
+  personality?: PersonalityId;
 }
 
 export const STREAMS = ["", "Physical Science (Maths)", "Biological Science", "Commerce", "Arts", "Technology", "Other"] as const;
@@ -117,7 +128,7 @@ export interface ImageAttachment {
 
 export interface Source {
   ref: number;
-  kind: "notes" | "paper" | "wikipedia" | "web";
+  kind: "notes" | "paper" | "document" | "wikipedia" | "wikidata" | "research" | "web";
   title: string;
   url: string | null;
   snippet: string;

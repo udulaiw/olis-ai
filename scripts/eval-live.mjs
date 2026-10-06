@@ -14,6 +14,18 @@
 //   citations   every [n] in the answer refers to a source that was actually sent
 // Not scored: whether the explanation is *good*. Read the printed answers for that, or have a teacher rate a sample.
 import { readFileSync, writeFileSync } from "node:fs";
+import { linesFromItems, dropRunningLines, pagesToMarkdown, cleanLine } from "../server/docs/pdflayout.mjs";
+
+/** Fixture PDF → the same text the browser would send (server/docs/pdflayout.mjs). */
+async function fixtureAttachment(file) {
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const task = pdfjs.getDocument({ data: new Uint8Array(readFileSync(new URL(`../evals/fixtures/docs/${file}`, import.meta.url))), verbosity: 0 });
+  const doc = await task.promise;
+  const pages = [];
+  for (let i = 1; i <= doc.numPages; i++) pages.push(linesFromItems((await (await doc.getPage(i)).getTextContent()).items));
+  await task.destroy();
+  return pagesToMarkdown(dropRunningLines(pages).map((ls) => ls.map((l) => ({ text: cleanLine(l.text).text, size: l.size }))));
+}
 
 const args = process.argv.slice(2);
 const opt = (n, d = "") => (args.includes(`--${n}`) ? args[args.indexOf(`--${n}`) + 1] : d);
@@ -35,7 +47,7 @@ async function ask(q, extra = {}) {
   let raw = "";
   for await (const chunk of res.body) raw += dec.decode(chunk, { stream: true });
   let text = "";
-  let sources = 0;
+  let sources = [];
   let err = null;
   for (const frame of raw.split("\n\n")) {
     const j = frame.replace(/^data: /, "").trim();
@@ -48,7 +60,7 @@ async function ask(q, extra = {}) {
     }
     if (e.type === "text") text += e.delta;
     else if (e.type === "rewind") text = text.slice(0, e.to);
-    else if (e.type === "sources") sources = e.sources.length;
+    else if (e.type === "sources") sources = e.sources;
     else if (e.type === "error") err = e.message;
   }
   return { text, sources, error: err, ms: Date.now() - t0 };
@@ -56,20 +68,27 @@ async function ask(q, extra = {}) {
 
 const rows = [];
 for (const c of data.live.filter((x) => !only || x.id === only)) {
-  const r = await ask(c.q, c.profile ? { profile: c.profile } : {});
+  const extra = { ...(c.profile ? { profile: c.profile } : {}), ...(c.attachment_fixture ? { attachment: await fixtureAttachment(c.attachment_fixture), attachmentName: c.attachment_fixture } : {}) };
+  const r = await ask(c.q, extra);
   const checks = {};
   if (r.error && !r.text) checks.answered = false;
   else {
     const t = r.text ?? "";
     checks.script = !/[ऀ-ॿ஀-௿�]/.test(t) && (c.reply === "en" || /[඀-෿]/.test(t));
     if (c.must_include_any) checks.include = c.must_include_any.some((s) => t.toLowerCase().includes(s.toLowerCase()));
+    if (c.must_include_all) checks.includeAll = c.must_include_all.every((s) => t.toLowerCase().includes(s.toLowerCase()));
+    if (c.expect_source_kinds) checks.sourceKinds = c.expect_source_kinds.every((k) => (r.sources ?? []).some((s) => s.kind === k));
+    if (c.expect_doc_page) checks.docPage = (r.sources ?? []).some((s) => s.kind === "document" && s.title.includes(`p.${c.expect_doc_page}`));
+    // faithfulness of page citations: every "p.N" the answer mentions must be a page of a document source that was sent
+    const pagesSent = new Set((r.sources ?? []).filter((s) => s.kind === "document").flatMap((s) => [...s.title.matchAll(/pp?\.(\d+)(?:–(\d+))?/g)].flatMap((m) => (m[2] ? Array.from({ length: +m[2] - +m[1] + 1 }, (_, i) => String(+m[1] + i)) : [m[1]]))));
+    if (c.attachment_fixture) checks.pagesFaithful = [...t.matchAll(/\bp(?:age|\.)\s?(\d+)/gi)].every((m) => pagesSent.has(m[1]));
     if (c.must_not_include) checks.exclude = c.must_not_include.every((s) => !t.toLowerCase().includes(s.toLowerCase()));
     if (c.expect_unsure) checks.unsure = UNSURE.test(t);
     const cited = [...t.matchAll(/\[(\d+)\]/g)].map((m) => +m[1]);
-    checks.citations = cited.every((n) => n >= 1 && n <= (r.sources ?? 0));
+    checks.citations = cited.every((n) => n >= 1 && n <= (r.sources ?? []).length);
   }
   const pass = Object.values(checks).every(Boolean);
-  rows.push({ id: c.id, tags: c.tags, pass, checks, ms: r.ms, sources: r.sources, error: r.error, answer: (r.text ?? "").slice(0, 600) });
+  rows.push({ id: c.id, tags: c.tags, pass, checks, ms: r.ms, sources: (r.sources ?? []).map((s) => `${s.kind}: ${s.title}`), error: r.error, answer: (r.text ?? "").slice(0, 600) });
   console.log(`${pass ? "✓" : "✗"} ${c.id}  ${r.ms}ms  ${Object.entries(checks).map(([k, v]) => `${k}:${v ? "ok" : "FAIL"}`).join(" ")}${r.error ? `  error: ${r.error}` : ""}`);
 }
 const passed = rows.filter((r) => r.pass).length;

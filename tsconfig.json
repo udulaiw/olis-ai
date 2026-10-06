@@ -37,6 +37,7 @@
     "scripts/ai-selftest.ts",
     "vite.config.ts",
     "scripts/lang-selftest.ts",
-    "scripts/eval.ts"
+    "scripts/eval.ts",
+    "scripts/rag-selftest.ts"
   ]
 }

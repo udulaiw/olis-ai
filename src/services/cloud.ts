@@ -98,6 +98,7 @@ export async function* cloudAgent(
   body: {
     messages: { role: "user" | "assistant"; content: string }[];
     attachment?: string;
+    attachmentName?: string;
     images?: CloudImage[];
     mode: Mode;
     context: LearningContext;

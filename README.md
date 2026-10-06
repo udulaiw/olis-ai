@@ -1,9 +1,9 @@
 # OLIS AI · Beta
 
 **Orbix Learning Intelligence System**: an AI learning workspace for students, built for the Sri Lankan G.C.E. A/L.
-`v0.3` · In active development · **$0 to run (Free Beta)**
+`v0.7` · In active development · **$0 to run (Free Beta)**
 
-OLIS is a research agent for learning. It checks a curated knowledge base (notes and past papers), researches Wikipedia and trusted websites when it needs to, and answers with **cited sources** in English or Sinhala, adapted to each student's subject, level and study profile. It routes every question to a suitable AI engine and **switches engines automatically** when one is busy or failing. If the cloud is unavailable, a full offline engine takes over.
+OLIS is a research agent for learning. It checks a curated knowledge base (notes and past papers) and the **PDFs / Word files students attach** (with real page citations), then Wikipedia, Wikidata, research papers (OpenAlex, arXiv, Crossref) and trusted websites when it needs to, and answers with **cited sources** in English, Sinhala or Tamil, adapted to each student's subject, level, study profile and chosen **personality** (Teacher, Tutor, Exam Coach, Socratic…). It routes every question to a suitable AI engine and **switches engines automatically** when one is busy or failing. If the cloud is unavailable, a full offline engine takes over.
 
 ---
 
@@ -14,13 +14,14 @@ Browser (React, no keys)          Vercel Functions (/api)                       
 ────────────────────────          ───────────────────────                         ──────────────────────
 Chat / Tools / Settings ─POST─▶  /api/agent ─▶ guard ─▶ classify ─▶ RAG ─▶ AI router ─┬─▶ Google Gemini (primary)
    language · profile    ◀─SSE─   steps, sources, text, rewind, notice, meta         ├─▶ NVIDIA (optional)
-   photos (downsized)             /api/generate  quiz & flashcards (JSON, same router) └─▶ Local model (dev only)
+   photos (downsized)             /api/generate  quiz & flashcards (JSON, same router) ├─▶ Groq · Cerebras · Mistral · OpenRouter free (optional)
+   PDF/DOCX read in browser                                                         └─▶ Open-source model server (optional)
                                   /api/health    public {ok,busy} only · ?detail=1 admin health (404 without token)
                                   /api/feedback  👍/👎 → logs / webhook
                                   /api/subjects  public subject registry · /api/olis/classify  router labels only
 ```
 
-Full routing details: **[docs/ai-architecture.md](docs/ai-architecture.md)**.
+Full routing details: **[docs/ai-architecture.md](docs/ai-architecture.md)**. Retrieval, documents, knowledge sources, personality and evaluation: **[docs/rag-documents-and-sources.md](docs/rag-documents-and-sources.md)**.
 
 ```
 api/                      Vercel Functions
@@ -30,13 +31,18 @@ server/
     router.ts               fallback, retries, timeouts
     intent.ts               subject router: subject, level, language, intent, difficulty, requires_*
     classify.ts policy.ts health.ts store.ts log.ts status.ts types.ts
-    providers/              gemini.ts · openai-compatible.ts (NVIDIA, Local) · index.ts
+    providers/              gemini.ts · openai-compatible.ts (Groq, Cerebras, NVIDIA, Mistral, OpenRouter, open-source; tool calling) · index.ts
+  docs/                   pdflayout.mjs (PDF → markdown, shared with ingest) · docx.mjs · retrieve.ts (search inside an attached document)
+  sources/                wikipedia · wikidata · research (OpenAlex, arXiv, Crossref) · cache · http
+  rerank.ts               second-stage reranking (exact formula/question/year signals + optional bge-reranker)
+  embeddings.mjs          Gemini or TEI (bge-m3) embeddings, shared by the indexer and queries
+  personality.ts          Settings → AI Personality (style only, never facts)
   knowledge/subjects.json ★ subject registry: subjects, units, aliases, answer strategies (edit to add a subject)
   knowledge/taxonomy.ts   loads and queries the registry
   agent.ts                research loop (tools, citations, streaming fallback)
   generate.ts             quiz / flashcards
   prompts.ts              persona, language, profile, A/L + past-paper rules
-  rag.ts tools.ts http.ts sanitize.ts config.ts gemini.ts (embeddings) text.mjs
+  rag.ts tools.ts http.ts sanitize.ts config.ts text.mjs (education-aware chunker)
 knowledge/                notes · syllabus/ · past-papers/ (see knowledge/README.md)
 scripts/                  build-index.mjs · vite-api.ts · test-ai.mjs + ai-selftest.ts
 src/                      React app (services/olisEngine.ts is the only thing the UI calls)
@@ -50,7 +56,13 @@ src/                      React app (services/olisEngine.ts is the only thing th
 |---|---|---|---|
 | **Google Gemini** | Primary: all tasks, tools, photos, Sinhala | `GEMINI_API_KEY` from https://aistudio.google.com/apikey | Use a project **with billing OFF**. With billing on, Google bills even "free" models, and OLIS can't detect that. |
 | **NVIDIA** | Optional fallback (DeepSeek, gpt-oss, Nemotron, Llama Vision) | `NVIDIA_API_KEY` from https://build.nvidia.com | ⚠ NVIDIA's free endpoints are for **development, testing and evaluation**, not production. Check their terms before enabling it on a public site. No tool calling (OLIS pre-fetches notes instead). |
-| **Local** | Optional, `npm run dev` only | `LOCAL_AI_BASE_URL` (e.g. Ollama `http://localhost:11434/v1`) | A Vercel function can't reach your computer. |
+| **Groq** | Optional fallback (Llama 3.3 70B, gpt-oss-120b), tool calling | `GROQ_API_KEY` from https://console.groq.com/keys | Free plan, very fast. Per-model daily limits. |
+| **Cerebras** | Optional fallback (gpt-oss-120b), tool calling | `CEREBRAS_API_KEY` from https://cloud.cerebras.ai | Free tier; 64k context. |
+| **Mistral** | Optional fallback (Mistral Small), tool calling | `MISTRAL_API_KEY` from https://console.mistral.ai | Free "Experiment" plan. ⚠ Free-plan data may be used for training unless you opt out. |
+| **OpenRouter** | Optional last-resort fallback | `OPENROUTER_API_KEY` from https://openrouter.ai/keys | Only free models (`openrouter/free`, `*:free`) pass Free Beta. 50 requests/day without credits. |
+| **Open-source server** | Optional (Ollama, Ollama Cloud, vLLM, LM Studio, HF endpoint) | `LOCAL_AI_BASE_URL` (+ `LOCAL_AI_API_KEY`) | Must be reachable from the internet when deployed. |
+
+Provider list source: [awesome-freellm-apis](https://github.com/open-free-llm-api/awesome-freellm-apis), each checked against the provider's own docs (Oct 2026). Unofficial "free GPT" proxies that reverse-engineer other companies' chat sites are deliberately **not** supported: they break those services' terms and send students' questions to unknown third parties.
 
 With only `GEMINI_API_KEY` set, OLIS still falls back between three Gemini models, which have separate free quotas.
 
@@ -62,6 +74,9 @@ See **`.env.example`** for every option. The important ones:
 |---|---|---|
 | `GEMINI_API_KEY` | none | Primary provider (and knowledge-base embeddings) |
 | `NVIDIA_API_KEY` | none | Optional fallback provider |
+| `GROQ_API_KEY`, `CEREBRAS_API_KEY`, `MISTRAL_API_KEY`, `OPENROUTER_API_KEY` | none | Optional free fallback providers |
+| `OPENALEX_API_KEY`, `OLIS_CONTACT_EMAIL` | none | Optional: bigger research-search budget / polite pool |
+| `RERANKER_URL`, `EMBED_PROVIDER` + `EMBED_URL` | none / `gemini` | Optional open-source reranker / embeddings on your own server |
 | `OLIS_FREE_BETA` | `true` | Blocks paid / unknown models. Only the exact value `false` turns it off |
 | `DAILY_REQUEST_LIMIT` | `150` | Per-student (IP) requests per day |
 | `RATE_LIMIT_PER_10MIN` | `30` | Per-student burst limit |
@@ -174,7 +189,9 @@ with `work:` metadata in `knowledge/literature/`. Details: **[docs/literature-in
 
 ## Student personalisation
 
-Settings → **Study profile**: A/L stream, subjects, answer language, explanation depth, current topic, weak topics, goal. It's stored in the browser only, sanitised on the server, and used in the system prompt. No names or contact details are collected.
+Settings → **AI Personality**: Normal, Friend, Teacher, Tutor, Exam Coach, Socratic, Professional, Simple, Motivator; response length (Concise / Balanced / Detailed); language (Auto / සිංහල / English / தமிழ்). Style only: accuracy and citation rules always win.
+
+Settings → **Study profile**: exam level, A/L stream, subjects, current topic, weak topics, goal. Everything is stored in the browser only, sanitised on the server, and used in the system prompt. No names or contact details are collected.
 
 ## Observability
 
@@ -187,7 +204,7 @@ Every AI call logs one JSON line (Vercel → Logs):
 
 Never logged: API keys (also redacted from provider error text), prompts, answers, profiles. Feedback logs keep only short excerpts (the full text goes to your webhook, if set).
 
-**Provider health:** set `OLIS_ADMIN_TOKEN`. In Settings, tap the **v0.5 · beta** label 5 times to reveal *Developer: AI engine health* (hidden from students), enter the token, and press **Test all** to send one tiny request to every configured engine: the quickest way to confirm a new key (e.g. NVIDIA) works. Same data: `GET /api/health?detail=1&probe=1` with header `x-olis-admin`. Without a valid token the endpoint answers 404, and the public `/api/health` returns only `{ok, busy}`.
+**Provider health:** set `OLIS_ADMIN_TOKEN`. In Settings, tap the **v0.7 · beta** label 5 times to reveal *Developer: AI engine health* (hidden from students), enter the token, and press **Test all** to send one tiny request to every configured engine: the quickest way to confirm a new key (e.g. NVIDIA) works. Same data: `GET /api/health?detail=1&probe=1` with header `x-olis-admin`. Without a valid token the endpoint answers 404, and the public `/api/health` returns only `{ok, busy}`.
 
 ## Security
 
@@ -206,7 +223,9 @@ Never logged: API keys (also redacted from provider error text), prompts, answer
 npm install
 cp .env.example .env.local   # add GEMINI_API_KEY (optional)
 npm run dev                  # frontend + /api together
-npm run test:ai              # 22 router/agent/API scenarios with mocked providers (no keys, no network)
+npm test                     # all suites: AI router/agent, language, literature, RAG/documents/sources, eval, plain-Node prod smoke
+npm run test:rag             # chunking, PDF/DOCX, document retrieval, reranker, embeddings, Wikipedia/Wikidata/OpenAlex/arXiv/Crossref (mocked)
+npm run eval                 # retrieval + document metrics with regression floors (no keys)
 npm run build                # typecheck + production build
 ```
 
@@ -237,9 +256,12 @@ Without a key, OLIS runs on its offline engine.
 ## Known beta limitations
 
 - Health and limits are per server instance unless Upstash is configured.
-- NVIDIA/Local models answer without live tool calls (notes are pre-fetched).
+- NVIDIA, OpenRouter and the open-source slot answer without tool calls (notes and document passages are pre-fetched); Groq, Cerebras and Mistral use tools.
+- Attached documents are read in the browser: scanned PDFs and old-font Sinhala PDFs are refused (attach photos instead). Up to 150 pages / 200k characters.
+- The knowledge base still has no History notes and only starter ICT / Geography notes; History questions fall back to Wikipedia and are labelled as such.
+- Without `RERANKER_URL`, reranking uses deterministic signals only (no cross-encoder).
 - The subject registry is provisional and the past-paper / syllabus folders start empty.
-- Tamil questions are routed and answered in Tamil, but retrieval has no Tamil glossary yet.
+- Tamil questions are routed and answered in Tamil, but retrieval has no Tamil glossary yet (semantic search still matches Tamil when embeddings are on).
 - Photos are sent for the current session only; history keeps a small thumbnail.
 - Chat history and the study profile live in the browser (no accounts yet).
 
@@ -247,6 +269,8 @@ Without a key, OLIS runs on its offline engine.
 
 - Created by **Udula**, [github.com/udulaiw](https://github.com/udulaiw)
 - [thinking-orbs](https://libraries.dev/orbs.html) · [Animate UI](https://animate-ui.com) icons (MIT + Commons Clause) · [Wikipedia](https://www.wikipedia.org) content (CC BY-SA)
+- [pdf.js](https://github.com/mozilla/pdf.js) (Apache-2.0) · [fflate](https://github.com/101arrowz/fflate) (MIT) · [Wikidata](https://www.wikidata.org) (CC0) · [OpenAlex](https://openalex.org) (CC0) · [arXiv API](https://info.arxiv.org/help/api/) · [Crossref](https://www.crossref.org)
+- Optional: [text-embeddings-inference](https://github.com/huggingface/text-embeddings-inference) (Apache-2.0) with [bge-m3](https://huggingface.co/BAAI/bge-m3) (MIT) and [bge-reranker-v2-m3](https://huggingface.co/BAAI/bge-reranker-v2-m3) (Apache-2.0)
 
 ---
 

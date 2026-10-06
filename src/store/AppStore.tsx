@@ -15,6 +15,7 @@ export const DEFAULT_PROFILE: StudyProfile = {
   currentTopic: "",
   weakTopics: [],
   goals: "",
+  personality: "normal",
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -318,7 +319,10 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
 
       const history = historyMsgs
         .filter((m) => (m.status === undefined || m.status === "done" || m.status === "stopped") && m.content.trim())
-        .map((m) => ({ role: m.role, content: m.hiddenContext ? `${m.content}\n\n${m.hiddenContext}` : m.content }));
+        // The document itself is sent once (below) and searched per question, so history carries only its name
+        .map((m) => ({ role: m.role, content: m.attachment ? `${m.content}\n\n(Attached: ${m.attachment.name})` : m.content }));
+      // The chat's most recent attached document stays available for follow-up questions about it
+      const docMsg = [userMsg, ...[...historyMsgs].reverse()].find((m) => m.role === "user" && m.hiddenContext);
 
       let content = "";
       let last = 0;
@@ -341,7 +345,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         const gen = generateResponse(
           {
             input: userMsg.content,
-            attachment: userMsg.hiddenContext,
+            attachment: docMsg?.hiddenContext,
+            attachmentNew: docMsg === userMsg,
             mode: userMsg.mode ?? "ask",
             images: imagePayloads.current.get(userMsg.id),
             context: settingsRef.current.context,
