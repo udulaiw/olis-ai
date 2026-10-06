@@ -12,6 +12,8 @@
     "social_science": {"task": "general", "label": "Social science", "prompt": "Social-science method: define the key term, explain the concept or model, give a Sri Lankan example, and evaluate (advantages / limitations) when the question asks to discuss. Current figures, laws and office-holders must name a source and year."},
     "logic": {"task": "reasoning", "label": "Logic", "prompt": "Logic method: put arguments in standard form (premises, conclusion), name the form or fallacy, and test validity explicitly (truth table, Venn diagram or rules of inference). Show every step of a truth table."},
     "language": {"task": "general", "label": "Language", "prompt": "Language method. When correcting the student's writing use exactly this order: **Your version** → **Corrected version** → **Why** (each error and the rule) → **A stronger alternative**. Be kind and specific. For essays and letters show the structure (introduction, body, conclusion; format of a formal letter). For literature, only discuss texts or passages the student gives you or that appear in the excerpts. For translation, keep the meaning and register, not a word-for-word copy."},
+    "literature": {"task": "reasoning", "label": "Literature", "prompt": "Literature method: interpretation backed by evidence from the text. Separate what the text says from what it suggests, quote only text that is in this conversation or in the excerpts, and follow the Literature & Language section for the form, task and answer mode."},
+    "comprehension": {"task": "general", "label": "Reading comprehension", "prompt": "Comprehension method: answer from the passage only. Separate what the passage states (point to the exact words) from what can be inferred from it (evidence + reasoning). Never add facts that are not in the passage."},
     "ict": {"task": "reasoning", "label": "ICT", "prompt": "ICT method: use precise terms. For code give correct, complete code in a fenced block, then explain how it works; show the expected output or a trace table. For number systems show the conversion digit by digit. For databases show the table/SQL. For networks name the layer or protocol involved."},
     "religion": {"task": "general", "label": "Religion", "prompt": "Religion method: academic, respectful and neutral; explain teachings as the tradition itself presents them. Use original terms (Pali, Sanskrit) with their meaning. Attribute a quotation to a text only if you are certain of the source."},
     "general": {"task": "general", "label": "General", "prompt": ""}
@@ -120,7 +122,7 @@
       "prompt": "A/L depth. For code, give correct, runnable code (Python unless the student uses another language) and explain it line by line.",
       "units": [
         {"id": "al-ict-concepts", "name": "Concepts of ICT and computer architecture", "keywords": ["computer architecture", "cpu", "register", "bus", "memory hierarchy", "cache", "fetch execute", "von neumann", "hardware"]},
-        {"id": "al-ict-data", "name": "Data representation and logic", "keywords": ["binary", "hexadecimal", "octal", "two's complement", "floating point", "ascii", "unicode", "boolean", "logic gate", "truth table", "karnaugh", "k-map"]},
+        {"id": "al-ict-data", "name": "Data representation and logic", "keywords": ["binary", "hexadecimal", "octal", "two's complement", "floating point", "ascii", "unicode", "boolean", "logic gate", "truth table", "karnaugh", "k-map", "character set", "character encoding", "utf-8"]},
         {"id": "al-ict-os", "name": "Operating systems", "keywords": ["operating system", "process", "scheduling", "deadlock", "virtual memory", "paging", "file system", "thread"]},
         {"id": "al-ict-networks", "name": "Data communication and networking", "keywords": ["network", "osi", "tcp/ip", "protocol", "ip address", "subnet", "router", "switch", "lan", "wan", "bandwidth", "modulation"]},
         {"id": "al-ict-systems", "name": "Systems analysis and design", "keywords": ["sdlc", "system analysis", "system design", "data flow diagram", "dfd", "feasibility", "waterfall", "agile", "requirement"]},
@@ -235,7 +237,7 @@
       "units": [
         {"id": "al-si-grammar", "name": "Grammar (ව්‍යාකරණ)", "keywords": ["ව්‍යාකරණ", "සන්ධි", "සමාස", "විභක්ති", "කාරක", "vyakarana", "sandhi", "samasa", "grammar"]},
         {"id": "al-si-writing", "name": "Writing and composition", "keywords": ["රචනා", "රචනාව", "ලිපිය", "නිබන්ධ", "rachana", "essay", "composition"]},
-        {"id": "al-si-literature", "name": "Literature (සාහිත්‍යය)", "keywords": ["සාහිත්‍ය", "කවිය", "කාව්", "නවකතා", "කෙටිකතා", "literature", "poem", "novel"]}
+        {"id": "al-si-literature", "name": "Literature (සාහිත්‍යය)", "keywords": ["සාහිත්‍ය", "කවිය", "කාව්", "නවකතා", "කෙටිකතා", "literature", "poem", "novel", "උපමා", "රූපක", "අලංකාර", "නාට්‍ය", "චරිත", "තේමාව", "කවි"], "strategy": "literature"}
       ]
     },
     {
@@ -251,7 +253,7 @@
       "units": [
         {"id": "al-en-grammar", "name": "Grammar and usage", "keywords": ["grammar", "tense", "tenses", "preposition", "passive voice", "reported speech", "conditional", "subject verb agreement", "punctuation", "sentence correction"]},
         {"id": "al-en-writing", "name": "Writing", "keywords": ["essay", "letter", "report", "article", "speech", "composition", "argumentative", "paragraph"]},
-        {"id": "al-en-literature", "name": "Literature", "keywords": ["poem", "poetry", "novel", "drama", "short story", "character", "theme", "literary device", "metaphor", "simile"]}
+        {"id": "al-en-literature", "name": "Literature", "keywords": ["poem", "poetry", "novel", "drama", "short story", "character", "theme", "literary device", "metaphor", "simile", "stanza", "poet", "poetic", "personification", "alliteration", "imagery", "symbolism", "irony", "foreshadowing", "enjambment", "soliloquy", "playwright", "protagonist", "narrator", "onomatopoeia", "hyperbole", "oxymoron", "rhyme scheme", "figurative language", "literary", "characterisation", "characterization", "dramatic irony", "sonnet", "novelist"], "strategy": "literature"}
       ]
     },
     {
@@ -267,7 +269,7 @@
       "units": [
         {"id": "al-ta-grammar", "name": "Grammar (இலக்கணம்)", "keywords": ["இலக்கணம்", "grammar", "புணர்ச்சி", "வேற்றுமை"]},
         {"id": "al-ta-writing", "name": "Writing (கட்டுரை)", "keywords": ["கட்டுரை", "கடிதம்", "essay", "letter"]},
-        {"id": "al-ta-literature", "name": "Literature (இலக்கியம்)", "keywords": ["இலக்கியம்", "கவிதை", "literature", "poem", "novel"]}
+        {"id": "al-ta-literature", "name": "Literature (இலக்கியம்)", "keywords": ["இலக்கியம்", "கவிதை", "literature", "poem", "novel", "நாடகம்", "சிறுகதை", "நாவல்", "உவமை", "உருவகம்", "கதாபாத்திரம்"], "strategy": "literature"}
       ]
     },
     {
@@ -349,7 +351,7 @@
       "prompt": "O/L depth: precise terms, binary arithmetic shown digit by digit, trace tables for algorithms.",
       "units": [
         {"id": "ol-ict-hardware", "name": "Computer hardware and software", "keywords": ["hardware", "software", "cpu", "ram", "operating system", "input device", "output device", "storage", "motherboard"]},
-        {"id": "ol-ict-numbers", "name": "Number systems and logic", "keywords": ["binary", "hexadecimal", "octal", "number system", "logic gate", "boolean", "and gate", "or gate", "not gate", "truth table"]},
+        {"id": "ol-ict-numbers", "name": "Number systems and logic", "keywords": ["binary", "hexadecimal", "octal", "number system", "logic gate", "boolean", "and gate", "or gate", "not gate", "truth table", "ascii", "unicode", "character set"]},
         {"id": "ol-ict-programming", "name": "Programming and algorithms", "keywords": ["algorithm", "flowchart", "pseudocode", "programming", "loop", "variable", "python", "pascal", "debugging"]},
         {"id": "ol-ict-database", "name": "Databases and spreadsheets", "keywords": ["database", "table", "primary key", "query", "spreadsheet", "excel", "formula", "cell reference", "word processing"]},
         {"id": "ol-ict-networks", "name": "Networks and the internet", "keywords": ["network", "internet", "lan", "wan", "protocol", "ip address", "email", "browser", "website", "cyber security", "ethics"]}
@@ -368,8 +370,8 @@
       "units": [
         {"id": "ol-en-grammar", "name": "Grammar and usage", "keywords": ["grammar", "tense", "tenses", "preposition", "article", "passive voice", "active voice", "reported speech", "direct speech", "conditional", "subject verb agreement", "punctuation"]},
         {"id": "ol-en-writing", "name": "Writing (essays, letters, notices)", "keywords": ["essay", "letter", "formal letter", "informal letter", "notice", "speech", "report", "dialogue", "paragraph", "composition"]},
-        {"id": "ol-en-comprehension", "name": "Reading and comprehension", "keywords": ["comprehension", "passage", "summary", "summarise", "vocabulary", "synonym", "antonym"]},
-        {"id": "ol-en-literature", "name": "Literature", "keywords": ["poem", "poetry", "short story", "novel", "drama", "character", "theme", "literature"]}
+        {"id": "ol-en-comprehension", "name": "Reading and comprehension", "keywords": ["comprehension", "passage", "summary", "summarise", "vocabulary", "synonym", "antonym", "unseen passage", "inference", "infer", "according to the passage"], "strategy": "comprehension"},
+        {"id": "ol-en-literature", "name": "Literature", "keywords": ["poem", "poetry", "short story", "novel", "drama", "character", "theme", "literature", "stanza", "poet", "poetic", "personification", "alliteration", "imagery", "symbolism", "irony", "foreshadowing", "enjambment", "soliloquy", "playwright", "protagonist", "narrator", "onomatopoeia", "hyperbole", "oxymoron", "rhyme scheme", "figurative language", "literary", "characterisation", "characterization", "dramatic irony", "sonnet", "novelist", "metaphor", "simile", "literary device"], "strategy": "literature"}
       ]
     },
     {
@@ -385,7 +387,7 @@
       "units": [
         {"id": "ol-si-grammar", "name": "Grammar (ව්‍යාකරණ)", "keywords": ["ව්‍යාකරණ", "සන්ධි", "සමාස", "විභක්ති", "කාරක", "vyakarana", "sandhi", "samasa"]},
         {"id": "ol-si-writing", "name": "Writing (රචනා, ලිපි)", "keywords": ["රචනා", "රචනාව", "ලිපිය", "ලිපි", "නිබන්ධ", "rachana", "essay", "letter"]},
-        {"id": "ol-si-literature", "name": "Literature (සාහිත්‍යය)", "keywords": ["සාහිත්‍ය", "කවිය", "කාව්", "නවකතා", "කෙටිකතා", "nisadas", "kawiya", "poem"]}
+        {"id": "ol-si-literature", "name": "Literature (සාහිත්‍යය)", "keywords": ["සාහිත්‍ය", "කවිය", "කාව්", "නවකතා", "කෙටිකතා", "nisadas", "kawiya", "poem", "උපමා", "රූපක", "අලංකාර", "නාට්‍ය", "චරිත", "තේමාව", "කවි"], "strategy": "literature"}
       ]
     },
     {

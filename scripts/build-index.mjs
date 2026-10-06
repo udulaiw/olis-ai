@@ -100,7 +100,7 @@ for (const file of files) {
       path: rel,
       text: c.text.replace(/\[p\.\d+\] ?/g, ""), // page markers are metadata (chunk.pages), not text the model should see or confuse with [n] citations
       // Optional structure (see knowledge/README.md). Absent fields are omitted.
-      ...pick(meta, ["unit", "year", "paper", "question", "question_type", "difficulty", "marks", "grade"]),
+      ...pick(meta, ["unit", "year", "paper", "question", "question_type", "difficulty", "marks", "grade", "form", "author", "work", "chapter", "theme", "device", "syllabus_year", "exam_year"]),
       language: meta.language || langOf(c.text),
       type,
       tier,

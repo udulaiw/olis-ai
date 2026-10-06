@@ -1,7 +1,7 @@
 # OLIS subject architecture (v0.4)
 
 How OLIS works out *what* a student is asking before it answers, and how to add subjects without touching code.
-This builds on the RAG / language / Unicode layer described in `docs/ol-al-upgrade.md`.
+This builds on the RAG / language / Unicode layer described in `docs/ol-al-upgrade.md`. Literature, language, comprehension and writing questions get an extra layer on top of this router: see `docs/literature-intelligence.md`.
 
 ```
 question ─▶ language (nlp.mjs) ─▶ subject + unit (registry) ─▶ level ─▶ intent ─▶ difficulty

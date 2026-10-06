@@ -13,6 +13,8 @@
 import { taxonomyPromptBlock, subjectById, STRATEGIES, type ExamLevel } from "./knowledge/taxonomy.js";
 import type { Difficulty, Intent, ReplyLanguage, Specialist } from "./ai/intent.js";
 import type { Grounding } from "./rag.js";
+import { literaturePromptBlock } from "./literature/prompts.js";
+import type { LitProfile } from "./literature/detect.js";
 
 export interface LearningContext {
   subject: string;
@@ -62,6 +64,8 @@ export interface PromptOptions {
   live?: { ok: boolean; domain: string } | null;
   memory?: { enabled: boolean; used: number; askingAboutSelf: boolean };
   history?: { asked: boolean; found: number };
+  /** Literature & language profile from the router (server/literature/detect.ts). */
+  literature?: LitProfile | null;
 }
 
 const DEPTH: Record<string, string> = {
@@ -290,6 +294,7 @@ export function systemPrompt(ctx: LearningContext, mode: string, opts: PromptOpt
     `Politely decline anything harmful or inappropriate for students.`,
     ``,
     strategyBlock(opts.discipline, opts.subjectId, opts.examLevel),
+    literaturePromptBlock(opts.literature, opts.reply),
     (opts.intent && PIPELINES[opts.intent]) || (opts.specialist === "past-paper" ? PIPELINES.past_paper : ""),
     opts.difficulty && DIFFICULTY[opts.difficulty] ? `# Difficulty\n${DIFFICULTY[opts.difficulty]}` : "",
     opts.requiresCurrentInfo && !opts.live

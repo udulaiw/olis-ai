@@ -48,6 +48,8 @@ export interface AnswerMeta {
   live?: { domain: string; ok: boolean; source: string; retrievedAt: string; dataTimestamp: string | null } | null;
   /** How much of the student's own context was used (counts only). */
   context?: { memories: number; previousChats: number };
+  /** Literature & language answer profile, when the question is one. */
+  lit?: { domain: string; form: string | null; task: string; mode: string; label: string } | null;
 }
 
 /** A message from one of the student's earlier chats, found in their browser (src/lib/recall.ts). */
@@ -183,7 +185,9 @@ export async function* runAgent(cfg: Config, req: AgentRequest, signal?: AbortSi
   if (req.mode !== "summarize" && cls.requiresRetrieval) {
     const id = `s${++stepN}`;
     yield { type: "step", id, label: "Checking OLIS study notes", status: "running" };
-    const found = await searchKnowledge(cfg, cls.retrievalQuery, { k: 4, subject: req.context.subject, signal, level: cls.examLevel }).catch(() => []);
+    // Literature: when the question names a work OLIS has notes on, filter to that work first (metadata before ranking), then fall back
+    let found = cls.work ? await searchKnowledge(cfg, cls.retrievalQuery, { k: 4, subject: req.context.subject, signal, level: cls.examLevel, work: cls.work }).catch(() => []) : [];
+    if (!found.length) found = await searchKnowledge(cfg, cls.retrievalQuery, { k: 4, subject: req.context.subject, signal, level: cls.examLevel }).catch(() => []);
     // Hits that only matched generic words ("marks", "question") are not evidence: don't show them or let the model cite them
     if (!req.attachment) grounding = groundingOf(found);
     // ...and when the verdict is "none", the incidental matches are not shown either (the model can still call search_knowledge_base itself)
@@ -226,7 +230,9 @@ export async function* runAgent(cfg: Config, req: AgentRequest, signal?: AbortSi
       level: cls.examLevel,
       intent: cls.intent,
       reply: cls.reply,
-      confidence: req.attachment ? null : confidenceOf(grounding, cls.intent),
+      // When the student supplied the text being analysed, that text is the evidence: an OLIS-source label would mislead
+      confidence: req.attachment || cls.literature?.hasText ? null : confidenceOf(grounding, cls.intent),
+      lit: cls.literature ? { domain: cls.literature.domain, form: cls.literature.form, task: cls.literature.task, mode: cls.literature.mode, label: cls.literature.label } : null,
       live: live ? { domain: live.domain, ok: live.ok, source: live.source.name, retrievedAt: live.retrievedAt, dataTimestamp: live.dataTimestamp } : null,
       context: { memories: usedMemories.length, previousChats: recall.length },
     },
@@ -254,6 +260,7 @@ export async function* runAgent(cfg: Config, req: AgentRequest, signal?: AbortSi
       live: live ? { ok: live.ok, domain: live.domain } : null,
       memory: { enabled: memoryOn, used: usedMemories.length, askingAboutSelf: cls.requiresMemory },
       history: { asked: cls.requiresHistory, found: recall.length },
+      literature: cls.literature,
     });
   let system = buildSystem();
   // The script the answer must stay in. Off when the student themselves is working in Hindi/Tamil.

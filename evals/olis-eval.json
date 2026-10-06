@@ -569,6 +569,66 @@
         "misleading"
       ],
       "note": "retrieval must still find the correct source so the model can correct the student"
+    },
+    {
+      "q": "What is personification?",
+      "expect": [
+        "knowledge/literature/literary-devices.md"
+      ],
+      "tags": [
+        "en",
+        "lit"
+      ]
+    },
+    {
+      "q": "difference between tone and mood in a poem",
+      "expect": [
+        "knowledge/literature/literary-devices.md"
+      ],
+      "tags": [
+        "en",
+        "lit"
+      ]
+    },
+    {
+      "q": "what is enjambment",
+      "expect": [
+        "knowledge/literature/literary-devices.md"
+      ],
+      "tags": [
+        "en",
+        "lit"
+      ]
+    },
+    {
+      "q": "How do I structure a literature essay introduction?",
+      "expect": [
+        "knowledge/literature/answer-frameworks.md"
+      ],
+      "tags": [
+        "en",
+        "lit"
+      ]
+    },
+    {
+      "q": "what does to what extent mean in a literature question",
+      "expect": [
+        "knowledge/literature/answer-frameworks.md"
+      ],
+      "tags": [
+        "en",
+        "lit"
+      ]
+    },
+    {
+      "q": "inferential comprehension questions",
+      "expect": [
+        "knowledge/literature/answer-frameworks.md"
+      ],
+      "tags": [
+        "en",
+        "lit"
+      ]
     }
   ],
   "no_source": [
@@ -611,6 +671,20 @@
       "q": "Write a Python program to sort a list",
       "tags": [
         "out-of-syllabus",
+        "en"
+      ]
+    },
+    {
+      "q": "Quote the last stanza of Kamala Wijeratne's poem about the Kandyan dancer",
+      "tags": [
+        "lit",
+        "en"
+      ]
+    },
+    {
+      "q": "Which poems are prescribed for the 2027 O/L English Literature syllabus?",
+      "tags": [
+        "lit",
         "en"
       ]
     }
@@ -679,7 +753,48 @@
     {"q": "Translate 'the cat sat on the mat' into Tamil", "want": {"intent": "translation", "requiresRetrieval": false}},
     {"q": "hi", "want": {"intent": "greeting", "requiresRetrieval": false, "subject": null}},
     {"q": "Make me a study plan for 2 weeks", "want": {"intent": "planning", "requiresRetrieval": false}},
-    {"q": "what is speed", "pref": "ta", "want": {"reply": "ta"}, "note": "saved Tamil preference"}
+    {"q": "what is speed", "pref": "ta", "want": {"reply": "ta"}, "note": "saved Tamil preference"},
+    {"q": "Explain the imagery in the poem", "examLevel": "OL", "want": {"subject": "ol-english", "discipline": "literature", "level": "OL", "specialist": "ol-literature"}, "note": "literature units route to the literature strategy"},
+    {"q": "Answer these comprehension questions from the passage", "examLevel": "OL", "want": {"subject": "ol-english", "discipline": "comprehension"}},
+    {"q": "Explain the character set ASCII", "examLevel": "AL", "want": {"subject": "al-ict", "literature": null}, "note": "'character' is ICT here, not literature"}
+  ],
+  "_literature_note": "Literature & Language layer (server/literature/detect.ts). want = expected LitProfile fields, or null = must NOT be treated as literature (regression guard for other subjects). Checked by scripts/lit-selftest.ts.",
+  "literature": [
+    {"q": "What is a metaphor?", "want": {"domain": "literature", "task": "devices", "hasText": false}},
+    {"q": "Analyse this poem:\nThe old house stands alone\nIts windows dark as stone\nThe wind forgets its name\nAnd nothing stays the same", "want": {"domain": "literature", "form": "poetry", "task": "analysis", "mode": "deep", "command": "analyse", "hasText": true}},
+    {"q": "What is the tone?", "history": [{"role": "user", "content": "Analyse this poem:\nThe old house stands alone\nIts windows dark as stone\nThe wind forgets its name\nAnd nothing stays the same"}, {"role": "assistant", "content": "..."}], "want": {"domain": "literature", "form": "poetry", "hasText": true}, "note": "follow-up about a poem pasted earlier"},
+    {"q": "How does the writer create tension in the opening of the story?", "want": {"domain": "literature", "command": "how_writer", "hasText": false}},
+    {"q": "To what extent is the protagonist responsible for his own downfall?", "want": {"domain": "literature", "command": "to_what_extent"}},
+    {"q": "Check my answer: The poet uses a simile to show the boy is sad. This shows he is sad.", "want": {"domain": "literature", "task": "feedback", "mode": "feedback", "hasText": true}},
+    {"q": "Is this sentence grammatically correct: He don't like apples", "want": {"domain": "language", "task": "grammar"}},
+    {"q": "Explain passive voice", "want": {"domain": "language", "task": "grammar", "command": "explain"}},
+    {"q": "Write a short story about a rainy day in Kandy", "want": {"task": "creative"}},
+    {"q": "Help me build an essay on the theme of loyalty in the novel", "want": {"domain": "literature", "form": "novel", "task": "essay", "mode": "essay"}},
+    {"q": "What is this question asking: 'How does the poet present nature in the poem?'", "want": {"task": "question_analysis"}},
+    {"q": "Give me revision notes on dramatic irony", "want": {"task": "devices", "mode": "revision"}},
+    {"q": "Don't give me the answer, guide me to find the imagery in the first stanza", "want": {"form": "poetry", "mode": "socratic"}},
+    {"q": "Teach me enjambment from the beginning", "want": {"task": "devices", "mode": "teach"}},
+    {"q": "Give me an exam-style answer on the theme of isolation in the poem", "want": {"task": "theme", "mode": "exam"}},
+    {"q": "Compare the two poems", "want": {"task": "compare"}},
+    {"q": "Paraphrase this stanza in simple English", "want": {"task": "paraphrase", "form": "poetry"}},
+    {"q": "Answer the comprehension questions according to the passage", "want": {"domain": "comprehension", "task": "comprehension", "hasText": false}},
+    {"q": "Explain the soliloquy in Act 2", "want": {"form": "drama"}},
+    {"q": "කවියේ උපමා මොනවාද?", "want": {"domain": "literature", "form": "poetry", "task": "devices", "textLanguage": "si"}},
+    {"q": "මේ කවියේ තේමාව මොකක්ද", "want": {"domain": "literature", "form": "poetry", "task": "theme"}},
+    {"q": "poem eke theme eka mokakda", "want": {"domain": "literature", "form": "poetry", "task": "theme"}},
+    {"q": "Write a letter to the principal asking for a library", "want": {"domain": "writing", "task": "creative"}},
+    {"q": "What is momentum?", "want": null},
+    {"q": "Explain the character set ASCII", "want": null},
+    {"q": "Write an essay on the causes of World War I", "want": null},
+    {"q": "What is the theme of the conference?", "want": null},
+    {"q": "Explain the twin paradox in relativity", "want": null},
+    {"q": "What is the tone of a sound wave?", "want": null},
+    {"q": "Aside from that, what is osmosis?", "want": null},
+    {"q": "Explain the Dhammapada verse on anger", "want": null},
+    {"q": "Describe the plot of land in a cadastral survey", "want": null},
+    {"q": "Solve 2x^2 - 5x - 3 = 0", "want": null},
+    {"q": "Translate this to Sinhala: good morning", "want": null},
+    {"q": "hi", "want": null}
   ],
   "_live_routing_note": "Time-sensitive query detection (server/live/detect.ts): [question, expected domain or null].",
   "live_routing": [
